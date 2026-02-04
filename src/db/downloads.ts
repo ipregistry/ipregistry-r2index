@@ -3,6 +3,7 @@ import type {
   DownloadRecord,
   AnalyticsScale,
   TimeSeriesBucket,
+  FileDownloadStats,
   AnalyticsSummary,
   DownloadsByIpResult,
   UserAgentStats,
@@ -137,21 +138,73 @@ export async function getTimeSeries(
 
   const whereClause = conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : '';
 
+  // Query per-file stats grouped by time bucket
   const query = `
-    SELECT ${bucketCol} as bucket, COUNT(*) as downloads, COUNT(DISTINCT ip_address) as unique_downloads
+    SELECT
+      ${bucketCol} as bucket,
+      remote_path,
+      remote_filename,
+      remote_version,
+      COUNT(*) as downloads,
+      COUNT(DISTINCT ip_address) as unique_downloads
+    FROM file_downloads
+    ${whereClause}
+    GROUP BY ${bucketCol}, remote_path, remote_filename, remote_version
+    ORDER BY ${bucketCol}, downloads DESC
+  `;
+
+  const result = await db.prepare(query).bind(...values).all<{
+    bucket: number;
+    remote_path: string;
+    remote_filename: string;
+    remote_version: string;
+    downloads: number;
+    unique_downloads: number;
+  }>();
+
+  // Group results by bucket
+  const bucketMap = new Map<number, { files: FileDownloadStats[]; total: number; unique: number }>();
+
+  for (const row of result.results) {
+    if (!bucketMap.has(row.bucket)) {
+      bucketMap.set(row.bucket, { files: [], total: 0, unique: 0 });
+    }
+    const bucket = bucketMap.get(row.bucket)!;
+    bucket.files.push({
+      remote_path: row.remote_path,
+      remote_filename: row.remote_filename,
+      remote_version: row.remote_version,
+      downloads: row.downloads,
+      unique_downloads: row.unique_downloads,
+    });
+    bucket.total += row.downloads;
+  }
+
+  // Calculate unique downloads per bucket (need separate query since DISTINCT spans files)
+  const uniqueQuery = `
+    SELECT ${bucketCol} as bucket, COUNT(DISTINCT ip_address) as unique_downloads
     FROM file_downloads
     ${whereClause}
     GROUP BY ${bucketCol}
     ORDER BY ${bucketCol}
   `;
+  const uniqueResult = await db.prepare(uniqueQuery).bind(...values).all<{ bucket: number; unique_downloads: number }>();
 
-  const result = await db.prepare(query).bind(...values).all<{ bucket: number; downloads: number; unique_downloads: number }>();
+  for (const row of uniqueResult.results) {
+    if (bucketMap.has(row.bucket)) {
+      bucketMap.get(row.bucket)!.unique = row.unique_downloads;
+    }
+  }
 
-  return result.results.map(r => ({
-    bucket: r.bucket,
-    downloads: r.downloads,
-    unique_downloads: r.unique_downloads,
-  }));
+  // Convert to array
+  return Array.from(bucketMap.entries())
+    .sort(([a], [b]) => a - b)
+    .map(([timestamp, data]) => ({
+      timestamp,
+      files: data.files,
+      total_downloads: data.total,
+      total_unique_downloads: data.unique,
+    }));
 }
 
 // ============================================================================

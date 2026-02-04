@@ -115,7 +115,7 @@ describe('GET /analytics/timeseries', () => {
     }
   });
 
-  it('returns time series with daily scale', async () => {
+  it('returns time series with daily scale and per-file breakdown', async () => {
     const now = Date.now();
     const start = now - 86400000;
     const end = now + 86400000;
@@ -125,11 +125,22 @@ describe('GET /analytics/timeseries', () => {
       { headers: createAuthHeaders() }
     );
     expect(response.status).toBe(200);
-    const data = await response.json() as { scale: string; data: { bucket: number; downloads: number; unique_downloads: number }[] };
+    const data = await response.json() as {
+      scale: string;
+      data: {
+        timestamp: number;
+        files: { remote_path: string; remote_filename: string; remote_version: string; downloads: number; unique_downloads: number }[];
+        total_downloads: number;
+        total_unique_downloads: number;
+      }[];
+    };
     expect(data.scale).toBe('day');
     expect(data.data.length).toBeGreaterThan(0);
-    expect(data.data[0].downloads).toBe(5);
-    expect(data.data[0].unique_downloads).toBe(5);
+    expect(data.data[0].total_downloads).toBe(5);
+    expect(data.data[0].total_unique_downloads).toBe(5);
+    expect(data.data[0].files.length).toBe(1);
+    expect(data.data[0].files[0].remote_path).toBe('/uploads/documents');
+    expect(data.data[0].files[0].downloads).toBe(5);
   });
 
   it('returns time series with hourly scale', async () => {
@@ -159,8 +170,9 @@ describe('GET /analytics/timeseries', () => {
       `http://localhost/analytics/timeseries?start=${now - 86400000}&end=${now + 86400000}&scale=day&remote_filename=report.pdf`,
       { headers: createAuthHeaders() }
     );
-    const data = await response.json() as { data: { downloads: number }[] };
-    expect(data.data[0].downloads).toBe(5); // Only original file
+    const data = await response.json() as { data: { total_downloads: number; files: unknown[] }[] };
+    expect(data.data[0].total_downloads).toBe(5); // Only original file
+    expect(data.data[0].files.length).toBe(1);
   });
 
   it('includes Cache-Control header', async () => {

@@ -445,11 +445,32 @@ curl "https://r2index.acme.com/analytics/timeseries?start=1704067200000&end=1706
 {
   "scale": "day",
   "data": [
-    { "bucket": 1704067200000, "downloads": 150, "unique_downloads": 45 },
-    { "bucket": 1704153600000, "downloads": 200, "unique_downloads": 62 }
+    {
+      "timestamp": 1704067200000,
+      "files": [
+        {
+          "remote_path": "acme/abuser",
+          "remote_filename": "abuser.csv",
+          "remote_version": "2026-02-03",
+          "downloads": 100,
+          "unique_downloads": 30
+        },
+        {
+          "remote_path": "acme/geolocation",
+          "remote_filename": "geolocation.mmdb",
+          "remote_version": "2026-02-03",
+          "downloads": 50,
+          "unique_downloads": 15
+        }
+      ],
+      "total_downloads": 150,
+      "total_unique_downloads": 45
+    }
   ]
 }
 ```
+
+The `timestamp` is the start of the time bucket (e.g., for `scale=day`, midnight UTC of that day).
 
 ### Analytics: Summary
 

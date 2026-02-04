@@ -151,10 +151,19 @@ export interface AnalyticsParams {
   offset?: number;
 }
 
-export interface TimeSeriesBucket {
-  bucket: number;
+export interface FileDownloadStats {
+  remote_path: string;
+  remote_filename: string;
+  remote_version: string;
   downloads: number;
   unique_downloads: number;
+}
+
+export interface TimeSeriesBucket {
+  timestamp: number;
+  files: FileDownloadStats[];
+  total_downloads: number;
+  total_unique_downloads: number;
 }
 
 export interface AnalyticsSummary {
