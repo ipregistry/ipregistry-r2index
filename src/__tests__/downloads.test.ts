@@ -303,4 +303,333 @@ describe('GET /analytics/user-agents', () => {
     expect(data.data[0].downloads).toBe(2);
     expect(data.data[0].unique_ips).toBe(2);
   });
+
+  it('respects limit parameter', async () => {
+    const now = Date.now();
+    const response = await SELF.fetch(
+      `http://localhost/analytics/user-agents?start=${now - 86400000}&end=${now + 86400000}&limit=2`,
+      { headers: createAuthHeaders() }
+    );
+    const data = await response.json() as { data: unknown[] };
+    expect(data.data.length).toBe(2);
+  });
+
+  it('filters by file', async () => {
+    // Add download for different file
+    await SELF.fetch('http://localhost/downloads', {
+      method: 'POST',
+      headers: createAuthHeaders(),
+      body: JSON.stringify({ ...validDownloadInput, remote_filename: 'other.pdf', user_agent: 'Edge/120', ip_address: '10.0.0.1' }),
+    });
+
+    const now = Date.now();
+    const response = await SELF.fetch(
+      `http://localhost/analytics/user-agents?start=${now - 86400000}&end=${now + 86400000}&remote_filename=report.pdf`,
+      { headers: createAuthHeaders() }
+    );
+    const data = await response.json() as { data: { user_agent: string }[] };
+    expect(data.data.find(d => d.user_agent === 'Edge/120')).toBeUndefined();
+  });
+});
+
+describe('Analytics - file id inclusion', () => {
+  beforeEach(async () => {
+    await env.DB.prepare('DELETE FROM file_downloads').run();
+    await env.DB.prepare('DELETE FROM file_tags').run();
+    await env.DB.prepare('DELETE FROM files').run();
+  });
+
+  it('includes file id when file exists in index', async () => {
+    // Create a file in the index
+    const fileResponse = await SELF.fetch('http://localhost/files', {
+      method: 'POST',
+      headers: createAuthHeaders(),
+      body: JSON.stringify({
+        category: 'test',
+        entity: 'test-entity',
+        extension: 'pdf',
+        media_type: 'application/pdf',
+        remote_path: '/uploads/documents',
+        remote_filename: 'report.pdf',
+        remote_version: 'v1',
+      }),
+    });
+    const file = await fileResponse.json() as { id: string };
+
+    // Record a download
+    await SELF.fetch('http://localhost/downloads', {
+      method: 'POST',
+      headers: createAuthHeaders(),
+      body: JSON.stringify(validDownloadInput),
+    });
+
+    // Check timeseries includes file id
+    const now = Date.now();
+    const response = await SELF.fetch(
+      `http://localhost/analytics/timeseries?start=${now - 86400000}&end=${now + 86400000}&scale=day`,
+      { headers: createAuthHeaders() }
+    );
+    const data = await response.json() as { data: { files: { id: string | null }[] }[] };
+    expect(data.data[0].files[0].id).toBe(file.id);
+  });
+
+  it('returns null id when file does not exist in index', async () => {
+    // Record a download without creating file in index
+    await SELF.fetch('http://localhost/downloads', {
+      method: 'POST',
+      headers: createAuthHeaders(),
+      body: JSON.stringify(validDownloadInput),
+    });
+
+    const now = Date.now();
+    const response = await SELF.fetch(
+      `http://localhost/analytics/timeseries?start=${now - 86400000}&end=${now + 86400000}&scale=day`,
+      { headers: createAuthHeaders() }
+    );
+    const data = await response.json() as { data: { files: { id: string | null }[] }[] };
+    expect(data.data[0].files[0].id).toBeNull();
+  });
+});
+
+describe('Analytics - multiple files', () => {
+  beforeEach(async () => {
+    await env.DB.prepare('DELETE FROM file_downloads').run();
+
+    // Create downloads for multiple files
+    const files = [
+      { ...validDownloadInput, remote_filename: 'file1.pdf' },
+      { ...validDownloadInput, remote_filename: 'file1.pdf', ip_address: '10.0.0.1' },
+      { ...validDownloadInput, remote_filename: 'file2.pdf', ip_address: '10.0.0.2' },
+    ];
+    for (const file of files) {
+      await SELF.fetch('http://localhost/downloads', {
+        method: 'POST',
+        headers: createAuthHeaders(),
+        body: JSON.stringify(file),
+      });
+    }
+  });
+
+  it('returns per-file breakdown in timeseries', async () => {
+    const now = Date.now();
+    const response = await SELF.fetch(
+      `http://localhost/analytics/timeseries?start=${now - 86400000}&end=${now + 86400000}&scale=day`,
+      { headers: createAuthHeaders() }
+    );
+    const data = await response.json() as {
+      data: {
+        files: { remote_filename: string; downloads: number; unique_downloads: number }[];
+        total_downloads: number;
+        total_unique_downloads: number;
+      }[];
+    };
+
+    expect(data.data[0].files.length).toBe(2);
+    expect(data.data[0].total_downloads).toBe(3);
+    // file1.pdf has 2 downloads from 2 unique IPs, file2.pdf has 1 download
+    const file1 = data.data[0].files.find(f => f.remote_filename === 'file1.pdf');
+    const file2 = data.data[0].files.find(f => f.remote_filename === 'file2.pdf');
+    expect(file1?.downloads).toBe(2);
+    expect(file1?.unique_downloads).toBe(2);
+    expect(file2?.downloads).toBe(1);
+  });
+
+  it('calculates total unique downloads across files correctly', async () => {
+    // Add download from same IP but different file
+    await SELF.fetch('http://localhost/downloads', {
+      method: 'POST',
+      headers: createAuthHeaders(),
+      body: JSON.stringify({ ...validDownloadInput, remote_filename: 'file3.pdf' }), // Same IP as file1.pdf first download
+    });
+
+    const now = Date.now();
+    const response = await SELF.fetch(
+      `http://localhost/analytics/timeseries?start=${now - 86400000}&end=${now + 86400000}&scale=day`,
+      { headers: createAuthHeaders() }
+    );
+    const data = await response.json() as { data: { total_downloads: number; total_unique_downloads: number }[] };
+
+    expect(data.data[0].total_downloads).toBe(4);
+    // 3 unique IPs total (192.168.1.1 downloaded 2 files, 10.0.0.1 and 10.0.0.2 each downloaded 1)
+    expect(data.data[0].total_unique_downloads).toBe(3);
+  });
+});
+
+describe('Analytics - time scales', () => {
+  beforeEach(async () => {
+    await env.DB.prepare('DELETE FROM file_downloads').run();
+
+    await SELF.fetch('http://localhost/downloads', {
+      method: 'POST',
+      headers: createAuthHeaders(),
+      body: JSON.stringify(validDownloadInput),
+    });
+  });
+
+  it('returns monthly scale with YYYYMM bucket', async () => {
+    const now = Date.now();
+    const date = new Date(now);
+    const expectedMonth = date.getUTCFullYear() * 100 + (date.getUTCMonth() + 1);
+
+    const response = await SELF.fetch(
+      `http://localhost/analytics/timeseries?start=${now - 86400000 * 30}&end=${now + 86400000}&scale=month`,
+      { headers: createAuthHeaders() }
+    );
+    const data = await response.json() as { scale: string; data: { timestamp: number }[] };
+
+    expect(data.scale).toBe('month');
+    expect(data.data[0].timestamp).toBe(expectedMonth);
+  });
+
+  it('defaults to daily scale', async () => {
+    const now = Date.now();
+    const response = await SELF.fetch(
+      `http://localhost/analytics/timeseries?start=${now - 86400000}&end=${now + 86400000}`,
+      { headers: createAuthHeaders() }
+    );
+    const data = await response.json() as { scale: string };
+    expect(data.scale).toBe('day');
+  });
+});
+
+describe('Analytics - validation', () => {
+  it('requires start parameter', async () => {
+    const response = await SELF.fetch(
+      'http://localhost/analytics/timeseries?end=1706745600000',
+      { headers: createAuthHeaders() }
+    );
+    expect(response.status).toBe(400);
+  });
+
+  it('requires end parameter', async () => {
+    const response = await SELF.fetch(
+      'http://localhost/analytics/timeseries?start=1704067200000',
+      { headers: createAuthHeaders() }
+    );
+    expect(response.status).toBe(400);
+  });
+
+  it('rejects invalid scale', async () => {
+    const response = await SELF.fetch(
+      'http://localhost/analytics/timeseries?start=1704067200000&end=1706745600000&scale=year',
+      { headers: createAuthHeaders() }
+    );
+    expect(response.status).toBe(400);
+  });
+
+  it('returns empty data for time range with no downloads', async () => {
+    await env.DB.prepare('DELETE FROM file_downloads').run();
+
+    const response = await SELF.fetch(
+      'http://localhost/analytics/timeseries?start=1704067200000&end=1706745600000&scale=day',
+      { headers: createAuthHeaders() }
+    );
+    expect(response.status).toBe(200);
+    const data = await response.json() as { data: unknown[] };
+    expect(data.data).toEqual([]);
+  });
+});
+
+describe('Analytics summary - filters', () => {
+  beforeEach(async () => {
+    await env.DB.prepare('DELETE FROM file_downloads').run();
+
+    // Downloads for file1
+    for (let i = 0; i < 3; i++) {
+      await SELF.fetch('http://localhost/downloads', {
+        method: 'POST',
+        headers: createAuthHeaders(),
+        body: JSON.stringify({ ...validDownloadInput, remote_filename: 'file1.pdf', ip_address: `192.168.1.${i}` }),
+      });
+    }
+    // Downloads for file2
+    for (let i = 0; i < 2; i++) {
+      await SELF.fetch('http://localhost/downloads', {
+        method: 'POST',
+        headers: createAuthHeaders(),
+        body: JSON.stringify({ ...validDownloadInput, remote_filename: 'file2.pdf', ip_address: `10.0.0.${i}` }),
+      });
+    }
+  });
+
+  it('filters summary by file', async () => {
+    const now = Date.now();
+    const response = await SELF.fetch(
+      `http://localhost/analytics/summary?start=${now - 86400000}&end=${now + 86400000}&remote_filename=file1.pdf`,
+      { headers: createAuthHeaders() }
+    );
+    const data = await response.json() as { total_downloads: number; unique_downloads: number };
+    expect(data.total_downloads).toBe(3);
+    expect(data.unique_downloads).toBe(3);
+  });
+
+  it('returns zero for non-matching filter', async () => {
+    const now = Date.now();
+    const response = await SELF.fetch(
+      `http://localhost/analytics/summary?start=${now - 86400000}&end=${now + 86400000}&remote_filename=nonexistent.pdf`,
+      { headers: createAuthHeaders() }
+    );
+    const data = await response.json() as { total_downloads: number; unique_downloads: number };
+    expect(data.total_downloads).toBe(0);
+    expect(data.unique_downloads).toBe(0);
+  });
+});
+
+describe('Analytics by-ip - edge cases', () => {
+  beforeEach(async () => {
+    await env.DB.prepare('DELETE FROM file_downloads').run();
+  });
+
+  it('returns empty for IP with no downloads', async () => {
+    const now = Date.now();
+    const response = await SELF.fetch(
+      `http://localhost/analytics/by-ip?ip=1.2.3.4&start=${now - 86400000}&end=${now + 86400000}`,
+      { headers: createAuthHeaders() }
+    );
+    const data = await response.json() as { downloads: unknown[]; total: number };
+    expect(data.total).toBe(0);
+    expect(data.downloads).toEqual([]);
+  });
+
+  it('returns downloads in descending order by time', async () => {
+    // Create downloads with slight delay
+    for (let i = 0; i < 3; i++) {
+      await SELF.fetch('http://localhost/downloads', {
+        method: 'POST',
+        headers: createAuthHeaders(),
+        body: JSON.stringify({ ...validDownloadInput, remote_filename: `file${i}.pdf` }),
+      });
+    }
+
+    const now = Date.now();
+    const response = await SELF.fetch(
+      `http://localhost/analytics/by-ip?ip=192.168.1.1&start=${now - 86400000}&end=${now + 86400000}`,
+      { headers: createAuthHeaders() }
+    );
+    const data = await response.json() as { downloads: { downloaded_at: number }[] };
+
+    // Should be in descending order
+    for (let i = 0; i < data.downloads.length - 1; i++) {
+      expect(data.downloads[i].downloaded_at).toBeGreaterThanOrEqual(data.downloads[i + 1].downloaded_at);
+    }
+  });
+
+  it('supports offset pagination', async () => {
+    for (let i = 0; i < 5; i++) {
+      await SELF.fetch('http://localhost/downloads', {
+        method: 'POST',
+        headers: createAuthHeaders(),
+        body: JSON.stringify({ ...validDownloadInput, remote_filename: `file${i}.pdf` }),
+      });
+    }
+
+    const now = Date.now();
+    const response = await SELF.fetch(
+      `http://localhost/analytics/by-ip?ip=192.168.1.1&start=${now - 86400000}&end=${now + 86400000}&limit=2&offset=2`,
+      { headers: createAuthHeaders() }
+    );
+    const data = await response.json() as { downloads: unknown[]; total: number };
+    expect(data.total).toBe(5);
+    expect(data.downloads.length).toBe(2);
+  });
 });

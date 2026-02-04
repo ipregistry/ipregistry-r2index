@@ -449,6 +449,7 @@ curl "https://r2index.acme.com/analytics/timeseries?start=1704067200000&end=1706
       "timestamp": 1704067200000,
       "files": [
         {
+          "id": "550e8400-e29b-41d4-a716-446655440000",
           "remote_path": "acme/abuser",
           "remote_filename": "abuser.csv",
           "remote_version": "2026-02-03",
@@ -456,6 +457,7 @@ curl "https://r2index.acme.com/analytics/timeseries?start=1704067200000&end=1706
           "unique_downloads": 30
         },
         {
+          "id": "550e8400-e29b-41d4-a716-446655440001",
           "remote_path": "acme/geolocation",
           "remote_filename": "geolocation.mmdb",
           "remote_version": "2026-02-03",
@@ -470,7 +472,8 @@ curl "https://r2index.acme.com/analytics/timeseries?start=1704067200000&end=1706
 }
 ```
 
-The `timestamp` is the start of the time bucket (e.g., for `scale=day`, midnight UTC of that day).
+- `timestamp`: Start of the time bucket (e.g., for `scale=day`, midnight UTC of that day; for `scale=month`, YYYYMM integer like `202401`)
+- `id`: File ID from the index (null if file not in index)
 
 ### Analytics: Summary
 

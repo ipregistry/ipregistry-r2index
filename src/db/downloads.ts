@@ -138,23 +138,28 @@ export async function getTimeSeries(
 
   const whereClause = conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : '';
 
-  // Query per-file stats grouped by time bucket
+  // Query per-file stats grouped by time bucket, joined with files to get id
   const query = `
     SELECT
-      ${bucketCol} as bucket,
-      remote_path,
-      remote_filename,
-      remote_version,
+      d.${bucketCol} as bucket,
+      f.id as file_id,
+      d.remote_path,
+      d.remote_filename,
+      d.remote_version,
       COUNT(*) as downloads,
-      COUNT(DISTINCT ip_address) as unique_downloads
-    FROM file_downloads
-    ${whereClause}
-    GROUP BY ${bucketCol}, remote_path, remote_filename, remote_version
-    ORDER BY ${bucketCol}, downloads DESC
+      COUNT(DISTINCT d.ip_address) as unique_downloads
+    FROM file_downloads d
+    LEFT JOIN files f ON f.remote_path = d.remote_path
+      AND f.remote_filename = d.remote_filename
+      AND f.remote_version = d.remote_version
+    ${whereClause.replace(/remote_/g, 'd.remote_').replace(/\b(hour_bucket|day_bucket|month_bucket)\b/g, 'd.$1')}
+    GROUP BY d.${bucketCol}, d.remote_path, d.remote_filename, d.remote_version
+    ORDER BY d.${bucketCol}, downloads DESC
   `;
 
   const result = await db.prepare(query).bind(...values).all<{
     bucket: number;
+    file_id: string | null;
     remote_path: string;
     remote_filename: string;
     remote_version: string;
@@ -171,6 +176,7 @@ export async function getTimeSeries(
     }
     const bucket = bucketMap.get(row.bucket)!;
     bucket.files.push({
+      id: row.file_id,
       remote_path: row.remote_path,
       remote_filename: row.remote_filename,
       remote_version: row.remote_version,

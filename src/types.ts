@@ -152,6 +152,7 @@ export interface AnalyticsParams {
 }
 
 export interface FileDownloadStats {
+  id: string | null;
   remote_path: string;
   remote_filename: string;
   remote_version: string;
