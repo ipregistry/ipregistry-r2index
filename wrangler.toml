@@ -1,0 +1,17 @@
+name = "r2-index"
+main = "src/index.ts"
+compatibility_date = "2026-02-01"
+
+routes = [
+  { pattern = "r2index.acme.com/*", zone_name = "acme.com" }
+]
+
+[[d1_databases]]
+binding = "DB"
+database_name = "r2-index"
+database_id = "<to-be-created>"
+
+# API_TOKEN should be set via: wrangler secret put API_TOKEN
+
+[vars]
+CACHE_MAX_AGE = "60"

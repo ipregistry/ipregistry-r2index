@@ -1,0 +1,434 @@
+# R2 Index
+
+Cloudflare Worker API for managing a D1 metadata index for files stored in R2.
+
+## Architecture
+
+```
+Client (Airflow, etc.)
+    │
+    ├─► Worker API ─► D1 (metadata CRUD/search)
+    │
+    └─► R2 (direct upload/download via S3-compatible API)
+```
+
+The Worker handles metadata only. File content is uploaded/downloaded directly to R2 using the S3-compatible API.
+
+## Setup
+
+### 1. Install dependencies
+
+```bash
+npm install
+```
+
+### 2. Create D1 database
+
+```bash
+wrangler d1 create r2-index
+```
+
+Update `wrangler.toml` with the returned `database_id`.
+
+### 3. Apply schema
+
+```bash
+npm run db:init
+```
+
+### 4. Set API token
+
+```bash
+wrangler secret put API_TOKEN
+```
+
+### 5. Deploy
+
+```bash
+npm run deploy
+```
+
+## Configuration
+
+### wrangler.toml
+
+```toml
+name = "r2-index"
+main = "src/index.ts"
+compatibility_date = "2026-02-01"
+
+routes = [
+  { pattern = "r2index.acme.com/*", zone_name = "acme.com" }
+]
+
+[[d1_databases]]
+binding = "DB"
+database_name = "r2-index"
+database_id = "<your-database-id>"
+```
+
+### Environment Variables
+
+| Variable | Description |
+|----------|-------------|
+| `API_TOKEN` | Bearer token for API authentication (set via `wrangler secret put`) |
+
+## Data Model
+
+### Core Fields
+
+| Field | Description | Example |
+|-------|-------------|---------|
+| `category` | Product or service grouping | `ipregistry` |
+| `entity` | Specific dataset identifier | `ipregistry-abuser`, `ipregistry-geolocation` |
+| `extension` | File format | `csv`, `csv.zip`, `mmdb` |
+| `media_type` | MIME type | `text/csv`, `application/zip` |
+| `name` | Human-readable name | `Abuser`, `Geolocation` |
+
+### Remote Location (Unique Constraint)
+
+The tuple `(remote_path, remote_filename, remote_version)` uniquely identifies a file in R2:
+
+| Field | Description | Example |
+|-------|-------------|---------|
+| `remote_path` | Directory path in R2 | `ipregistry/abuser` |
+| `remote_filename` | File name in R2 | `abuser.csv` |
+| `remote_version` | Version identifier | `2026-02-03`, `v1.0.0` |
+
+### Optional Metadata
+
+| Field | Description |
+|-------|-------------|
+| `size` | File size in bytes |
+| `metadata_path` | Path to associated metadata file |
+| `checksum_md5` | MD5 hash |
+| `checksum_sha1` | SHA1 hash |
+| `checksum_sha256` | SHA256 hash |
+| `checksum_sha512` | SHA512 hash |
+| `extra` | Arbitrary JSON (e.g., `header_line`, `line_count`) |
+| `tags` | Array of tags for filtering |
+| `deprecated` | Boolean flag |
+| `deprecation_reason` | Reason for deprecation |
+
+## API Reference
+
+All endpoints require authentication via `Authorization: Bearer <token>` header.
+
+### Health Check
+
+```
+GET /health
+```
+
+Returns `{ "status": "ok" }`. No authentication required.
+
+### Create/Update File (Upsert)
+
+```
+POST /files
+```
+
+Creates or updates a file based on the unique constraint `(remote_path, remote_filename, remote_version)`.
+
+**Request Body:**
+
+```json
+{
+  "category": "ipregistry",
+  "entity": "ipregistry-abuser",
+  "extension": "csv",
+  "media_type": "text/csv",
+  "name": "Abuser",
+  "remote_path": "ipregistry/abuser",
+  "remote_filename": "abuser.csv",
+  "remote_version": "2026-02-03",
+  "size": 5023465,
+  "checksum_md5": "21a165f3ddef92b90dccb0c1bb4e249f",
+  "checksum_sha1": "b588c39c691a2bc2cdd81e9f826ae9b5eb163e39",
+  "checksum_sha256": "8dac526e40c250f3ad117d05452e04814e2c979754a2e4810d8f85413d188ba6",
+  "checksum_sha512": "0f4bdedf66e5ec214aa1302d624913c2137c9cbfe1f81c0a63138c9ddd69d0c0",
+  "extra": {
+    "header_line": "# ip_start,ip_end",
+    "line_count": 169964
+  },
+  "tags": ["ip", "security"]
+}
+```
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `category` | string | Yes | Product or service grouping (e.g., `ipregistry`) |
+| `checksum_md5` | string | No | MD5 hash |
+| `checksum_sha1` | string | No | SHA1 hash |
+| `checksum_sha256` | string | No | SHA256 hash |
+| `checksum_sha512` | string | No | SHA512 hash |
+| `entity` | string | Yes | Dataset identifier (e.g., `ipregistry-abuser`) |
+| `extension` | string | Yes | File format (e.g., `csv`, `mmdb`) |
+| `extra` | object | No | Arbitrary JSON (merged into nested index output) |
+| `media_type` | string | Yes | MIME type (e.g., `text/csv`) |
+| `metadata_path` | string | No | Path to associated metadata file |
+| `name` | string | No | Human-readable name (e.g., `Abuser`) |
+| `remote_filename` | string | Yes | Filename in R2 |
+| `remote_path` | string | Yes | Directory path in R2 |
+| `remote_version` | string | Yes | Version identifier (e.g., `2026-02-03`) |
+| `size` | integer | No | File size in bytes |
+| `tags` | string[] | No | Tags for filtering |
+
+**Response:** `201 Created` (new) or `200 OK` (updated) with file record (includes auto-generated `id`).
+
+### Get File
+
+```
+GET /files/:id
+```
+
+**Response:** `200 OK` with file record or `404 Not Found`.
+
+### Update File
+
+```
+PUT /files/:id
+```
+
+**Request Body:** Any subset of file fields to update.
+
+**Response:** `200 OK` with updated file record.
+
+### Delete File by ID
+
+```
+DELETE /files/:id
+```
+
+Removes file metadata from the index. Does **not** delete the actual file in R2.
+
+**Response:** `200 OK` with `{ "success": true }` or `404 Not Found`.
+
+### Delete File by Remote Tuple
+
+```
+DELETE /files
+```
+
+Removes file metadata from the index. Does **not** delete the actual file in R2.
+
+**Request Body:**
+
+```json
+{
+  "remote_path": "ipregistry/abuser",
+  "remote_filename": "abuser.csv",
+  "remote_version": "2026-02-03"
+}
+```
+
+**Response:** `200 OK` with `{ "success": true }` or `404 Not Found`.
+
+### Search Files
+
+```
+GET /files
+```
+
+**Query Parameters:**
+
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `category` | string | Filter by category (exact match) |
+| `deprecated` | boolean | Filter by deprecated status (`true` or `false`) |
+| `entity` | string | Filter by entity (exact match) |
+| `extension` | string | Filter by extension (exact match) |
+| `limit` | integer | Max results (default: 100, max: 1000) |
+| `media_type` | string | Filter by media type (exact match) |
+| `offset` | integer | Pagination offset (default: 0) |
+| `tags` | string | Filter by tags (comma-separated, must have ALL) |
+| `group_by` | string | Group results by field: `category`, `entity`, `extension`, `media_type`, `deprecated` |
+
+**Example Requests:**
+
+```bash
+# Get all files
+curl "https://r2index.acme.com/files"
+
+# Filter by category
+curl "https://r2index.acme.com/files?category=ipregistry"
+
+# Filter by category and entity
+curl "https://r2index.acme.com/files?category=ipregistry&entity=ipregistry-abuser"
+
+# Filter by extension
+curl "https://r2index.acme.com/files?extension=csv"
+
+# Filter by tags (must have ALL specified tags)
+curl "https://r2index.acme.com/files?tags=ip,security"
+
+# Filter non-deprecated files only
+curl "https://r2index.acme.com/files?deprecated=false"
+
+# Combine filters with pagination
+curl "https://r2index.acme.com/files?category=ipregistry&extension=csv&limit=50&offset=0"
+
+# Group by extension for a given category
+curl "https://r2index.acme.com/files?category=ipregistry&group_by=extension"
+```
+
+**Grouped Response (when using `group_by`):**
+
+```json
+{
+  "groups": [
+    { "value": "csv", "count": 14 },
+    { "value": "csv.zip", "count": 14 },
+    { "value": "mmdb", "count": 14 }
+  ],
+  "total": 42
+}
+```
+
+**Response:**
+
+```json
+{
+  "files": [
+    {
+      "id": "550e8400-e29b-41d4-a716-446655440000",
+      "name": "Abuser",
+      "category": "ipregistry",
+      "entity": "ipregistry-abuser",
+      "extension": "csv",
+      "media_type": "text/csv",
+      "remote_path": "ipregistry/abuser",
+      "remote_filename": "abuser.csv",
+      "remote_version": "2026-02-03",
+      "metadata_path": null,
+      "size": 5023465,
+      "checksum_md5": "21a165f3ddef92b90dccb0c1bb4e249f",
+      "checksum_sha1": "b588c39c691a2bc2cdd81e9f826ae9b5eb163e39",
+      "checksum_sha256": "8dac526e40c250f3ad117d05452e04814e2c979754a2e4810d8f85413d188ba6",
+      "checksum_sha512": "0f4bdedf66e5ec214aa1302d624913c2137c9cbfe1f81c0a63138c9ddd69d0c0",
+      "extra": {
+        "header_line": "# ip_start,ip_end",
+        "line_count": 169964
+      },
+      "deprecated": false,
+      "deprecation_reason": "",
+      "created": 1706918150000,
+      "updated": 1706918150000,
+      "tags": ["ip", "security"]
+    }
+  ],
+  "total": 1
+}
+```
+
+### Get Nested Index
+
+```
+GET /files/index
+```
+
+Returns files grouped by entity then by extension in a nested structure. Useful for generating compatibility indexes.
+
+**Query Parameters:** Same filters as Search Files (except `limit`, `offset`, `group_by`).
+
+**Example Request:**
+
+```bash
+curl "https://r2index.acme.com/files/index?category=ipregistry"
+```
+
+**Response:**
+
+```json
+{
+  "ipregistry-abuser": {
+    "csv": {
+      "checksums": {
+        "md5": "21a165f3ddef92b90dccb0c1bb4e249f",
+        "sha1": "b588c39c691a2bc2cdd81e9f826ae9b5eb163e39",
+        "sha256": "8dac526e40c250f3ad117d05452e04814e2c979754a2e4810d8f85413d188ba6",
+        "sha512": "0f4bdedf66e5ec214aa1302d624913c2137c9cbfe1f81c0a63138c9ddd69d0c0c8ffc5f296a3c6d9c4256b86ca2a18b08c34e7f6897d152c16dde6526a07461f"
+      },
+      "file_size": "5023465",
+      "last_updated": "2026-02-03T18:55:50.000Z",
+      "name": "Abuser",
+      "header_line": "# ip_start,ip_end",
+      "line_count": 169964
+    },
+    "mmdb": {
+      "checksums": {
+        "md5": "2cf1f2d9ae301714b7ed7979553c76be"
+      },
+      "file_size": "10573656",
+      "last_updated": "2026-02-03T18:55:50.000Z"
+    }
+  },
+  "ipregistry-as": {
+    "csv": {
+      "checksums": {
+        "md5": "8356651e9e7bfdbf94fa41c9911d9cdf"
+      },
+      "file_size": "7355656",
+      "last_updated": "2026-02-03T18:54:02.000Z",
+      "name": "AS"
+    }
+  }
+}
+```
+
+Extra fields from the `extra` JSON column are merged into each entry.
+
+## Database Schema
+
+### files
+
+| Column | Type | Description |
+|--------|------|-------------|
+| `category` | TEXT | File category |
+| `checksum_md5` | TEXT | MD5 checksum |
+| `checksum_sha1` | TEXT | SHA1 checksum |
+| `checksum_sha256` | TEXT | SHA256 checksum |
+| `checksum_sha512` | TEXT | SHA512 checksum |
+| `created` | INTEGER | Creation timestamp (ms) |
+| `deprecated` | INTEGER | Deprecation flag (returns as boolean) |
+| `deprecation_reason` | TEXT | Reason for deprecation |
+| `entity` | TEXT | Entity type |
+| `extension` | TEXT | File extension |
+| `extra` | TEXT | JSON metadata |
+| `id` | TEXT | Primary key (auto-generated UUID) |
+| `media_type` | TEXT | MIME type |
+| `metadata_path` | TEXT | Path to metadata file |
+| `name` | TEXT | Human-readable name |
+| `remote_filename` | TEXT | Filename in R2 |
+| `remote_path` | TEXT | Path in R2 bucket |
+| `remote_version` | TEXT | Version identifier |
+| `size` | INTEGER | File size in bytes |
+| `updated` | INTEGER | Last update timestamp (ms) |
+
+**Unique Constraint:** `(remote_path, remote_filename, remote_version)`
+
+### file_tags
+
+| Column | Type | Description |
+|--------|------|-------------|
+| `file_id` | TEXT | Foreign key to files.id |
+| `tag` | TEXT | Tag value |
+
+**Primary Key:** `(file_id, tag)`
+
+## Development
+
+```bash
+# Run locally
+npm run dev
+
+# Type check
+npx tsc --noEmit
+
+# Deploy
+npm run deploy
+```
+
+## License
+
+MIT
