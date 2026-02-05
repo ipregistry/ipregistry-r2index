@@ -10,68 +10,7 @@ from elaunira.r2index import (
     R2IndexClient,
     RemoteTuple,
 )
-from elaunira.r2index.client import _parse_object_id
 from elaunira.r2index.storage import R2TransferConfig
-
-
-class TestParseObjectId:
-    """Tests for _parse_object_id function."""
-
-    def test_parse_simple_path(self):
-        """Test parsing a simple object ID."""
-        result = _parse_object_id("/releases/myapp/v1/myapp.zip", "test-bucket")
-        assert result.bucket == "test-bucket"
-        assert result.remote_path == "/releases/myapp"
-        assert result.remote_version == "v1"
-        assert result.remote_filename == "myapp.zip"
-
-    def test_parse_deep_path(self):
-        """Test parsing a deeply nested object ID."""
-        result = _parse_object_id("/software/tools/releases/myapp/v2/tool.tar.gz", "test-bucket")
-        assert result.bucket == "test-bucket"
-        assert result.remote_path == "/software/tools/releases/myapp"
-        assert result.remote_version == "v2"
-        assert result.remote_filename == "tool.tar.gz"
-
-    def test_parse_minimal_path(self):
-        """Test parsing minimum required components."""
-        result = _parse_object_id("/path/version/file.txt", "test-bucket")
-        assert result.bucket == "test-bucket"
-        assert result.remote_path == "/path"
-        assert result.remote_version == "version"
-        assert result.remote_filename == "file.txt"
-
-    def test_parse_without_leading_slash(self):
-        """Test parsing object ID without leading slash."""
-        result = _parse_object_id("releases/myapp/v1/myapp.zip", "test-bucket")
-        assert result.bucket == "test-bucket"
-        assert result.remote_path == "/releases/myapp"
-        assert result.remote_version == "v1"
-        assert result.remote_filename == "myapp.zip"
-
-    def test_parse_with_trailing_slash(self):
-        """Test parsing object ID with trailing slash."""
-        result = _parse_object_id("/releases/myapp/v1/myapp.zip/", "test-bucket")
-        assert result.bucket == "test-bucket"
-        assert result.remote_path == "/releases/myapp"
-        assert result.remote_version == "v1"
-        assert result.remote_filename == "myapp.zip"
-
-    def test_parse_too_few_components(self):
-        """Test error when object ID has too few components."""
-        with pytest.raises(ValueError) as exc_info:
-            _parse_object_id("/path/file.txt", "test-bucket")
-        assert "at least 3 components" in str(exc_info.value)
-
-    def test_parse_single_component(self):
-        """Test error with single component."""
-        with pytest.raises(ValueError):
-            _parse_object_id("/file.txt", "test-bucket")
-
-    def test_parse_empty_string(self):
-        """Test error with empty string."""
-        with pytest.raises(ValueError):
-            _parse_object_id("", "test-bucket")
 
 
 class TestGetByTuple:
@@ -200,7 +139,9 @@ class TestDownload:
         ) as mock_download:
             downloaded_path, file_record = client_with_r2.download(
                 bucket="test-bucket",
-                object_id="/releases/myapp/v1/myapp.zip",
+                source_path="/releases/myapp",
+                source_filename="myapp.zip",
+                source_version="v1",
                 destination=str(destination),
             )
 
@@ -263,7 +204,9 @@ class TestDownload:
         ):
             downloaded_path, file_record = client_with_r2.download(
                 bucket="test-bucket",
-                object_id="/releases/myapp/v1/myapp.zip",
+                source_path="/releases/myapp",
+                source_filename="myapp.zip",
+                source_version="v1",
                 destination=str(destination),
                 ip_address="10.0.0.1",
                 user_agent="custom-agent/1.0",
@@ -271,22 +214,6 @@ class TestDownload:
 
             assert downloaded_path == destination
             assert file_record.id == "file123"
-
-    def test_download_invalid_object_id(
-        self, client_with_r2: R2IndexClient, tmp_path: Path
-    ):
-        """Test download with invalid object ID."""
-        destination = tmp_path / "file.zip"
-
-        with pytest.raises(ValueError) as exc_info:
-            client_with_r2.download(
-                bucket="test-bucket",
-                object_id="/invalid/path",
-                destination=str(destination),
-                ip_address="10.0.0.1",
-            )
-
-        assert "at least 3 components" in str(exc_info.value)
 
 
 class TestR2TransferConfig:

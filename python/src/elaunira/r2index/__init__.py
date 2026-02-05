@@ -2,7 +2,7 @@
 
 from importlib.metadata import version
 
-__version__ = version("elaunira-r2index")
+__version__: str = version("elaunira-r2index")
 
 from .async_client import AsyncR2IndexClient
 from .async_storage import AsyncR2Storage

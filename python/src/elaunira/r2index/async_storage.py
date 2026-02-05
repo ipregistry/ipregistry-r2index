@@ -113,6 +113,51 @@ class AsyncR2Storage:
         except Exception as e:
             raise UploadError(f"Failed to delete object from R2: {e}") from e
 
+    async def upload_bytes(
+        self,
+        data: bytes,
+        bucket: str,
+        object_key: str,
+        content_type: str | None = None,
+    ) -> str:
+        """
+        Upload bytes directly to R2 asynchronously.
+
+        Args:
+            data: The bytes to upload.
+            bucket: The R2 bucket name.
+            object_key: The key (path) to store the object under in R2.
+            content_type: Optional content type for the object.
+
+        Returns:
+            The object key of the uploaded data.
+
+        Raises:
+            UploadError: If the upload fails.
+        """
+        extra_args = {}
+        if content_type:
+            extra_args["ContentType"] = content_type
+
+        try:
+            async with self._session.client(
+                "s3",
+                aws_access_key_id=self.config.access_key_id,
+                aws_secret_access_key=self.config.secret_access_key,
+                endpoint_url=self.config.endpoint_url,
+                region_name=self.config.region,
+            ) as client:
+                await client.put_object(
+                    Bucket=bucket,
+                    Key=object_key,
+                    Body=data,
+                    **extra_args,
+                )
+        except Exception as e:
+            raise UploadError(f"Failed to upload bytes to R2: {e}") from e
+
+        return object_key
+
     async def object_exists(self, bucket: str, object_key: str) -> bool:
         """
         Check if an object exists in R2 asynchronously.

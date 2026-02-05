@@ -32,48 +32,11 @@ from .models import (
     TimeseriesResponse,
     UserAgentsResponse,
 )
-from . import __version__
+from . import __version__ as _version
 from .storage import R2Config, R2TransferConfig
 
 CHECKIP_URL = "https://checkip.amazonaws.com"
-DEFAULT_USER_AGENT = f"elaunira-r2index/{__version__}"
-
-
-def _parse_object_id(object_id: str, bucket: str) -> RemoteTuple:
-    """
-    Parse an object_id into remote_path, remote_version, and remote_filename.
-
-    Format: /path/to/object/version/filename.ext
-    - remote_filename: last component (filename.ext)
-    - remote_version: second-to-last component (version)
-    - remote_path: everything before that (/path/to/object)
-
-    Args:
-        object_id: Full object path like /releases/myapp/v1/myapp.zip
-        bucket: The S3/R2 bucket name.
-
-    Returns:
-        RemoteTuple with parsed components including bucket.
-
-    Raises:
-        ValueError: If object_id doesn't have enough components.
-    """
-    parts = object_id.strip("/").split("/")
-    if len(parts) < 3:
-        raise ValueError(
-            f"object_id must have at least 3 components (path/version/filename), got: {object_id}"
-        )
-
-    remote_filename = parts[-1]
-    remote_version = parts[-2]
-    remote_path = "/" + "/".join(parts[:-2])
-
-    return RemoteTuple(
-        bucket=bucket,
-        remote_path=remote_path,
-        remote_filename=remote_filename,
-        remote_version=remote_version,
-    )
+DEFAULT_USER_AGENT = f"elaunira-r2index/{_version}"
 
 
 class AsyncR2IndexClient:
@@ -163,14 +126,17 @@ class AsyncR2IndexClient:
 
     # File Operations
 
-    async def list(
+    async def list_files(
         self,
         bucket: str | None = None,
         category: str | None = None,
         entity: str | None = None,
+        extension: str | None = None,
+        media_type: str | None = None,
         tags: list[str] | None = None,
-        page: int | None = None,
-        page_size: int | None = None,
+        deprecated: bool | None = None,
+        limit: int | None = None,
+        offset: int | None = None,
     ) -> FileListResponse:
         """
         List files with optional filters.
@@ -179,12 +145,15 @@ class AsyncR2IndexClient:
             bucket: Filter by bucket.
             category: Filter by category.
             entity: Filter by entity.
+            extension: Filter by file extension.
+            media_type: Filter by media type.
             tags: Filter by tags.
-            page: Page number (1-indexed).
-            page_size: Number of items per page.
+            deprecated: Filter by deprecated status.
+            limit: Maximum number of results.
+            offset: Number of results to skip.
 
         Returns:
-            FileListResponse with files and pagination info.
+            FileListResponse with files and total count.
         """
         params: dict[str, Any] = {}
         if bucket:
@@ -193,12 +162,18 @@ class AsyncR2IndexClient:
             params["category"] = category
         if entity:
             params["entity"] = entity
+        if extension:
+            params["extension"] = extension
+        if media_type:
+            params["media_type"] = media_type
         if tags:
             params["tags"] = ",".join(tags)
-        if page:
-            params["page"] = page
-        if page_size:
-            params["pageSize"] = page_size
+        if deprecated is not None:
+            params["deprecated"] = "true" if deprecated else "false"
+        if limit:
+            params["limit"] = str(limit)
+        if offset:
+            params["offset"] = str(offset)
 
         response = await self._client.get("/files", params=params)
         data = self._handle_response(response)
@@ -312,9 +287,9 @@ class AsyncR2IndexClient:
         category: str | None = None,
         entity: str | None = None,
         tags: list[str] | None = None,
-    ) -> list[IndexEntry]:
+    ) -> dict[str, Any]:
         """
-        Get file index (lightweight listing).
+        Get file index (nested structure grouped by entity then extension).
 
         Args:
             bucket: Filter by bucket.
@@ -323,7 +298,7 @@ class AsyncR2IndexClient:
             tags: Filter by tags.
 
         Returns:
-            List of IndexEntry objects.
+            Nested dictionary structure.
         """
         params: dict[str, Any] = {}
         if bucket:
@@ -336,8 +311,8 @@ class AsyncR2IndexClient:
             params["tags"] = ",".join(tags)
 
         response = await self._client.get("/files/index", params=params)
-        data = self._handle_response(response)
-        return [IndexEntry.model_validate(item) for item in data]
+        data: dict[str, Any] = self._handle_response(response)
+        return data
 
     # Download Tracking
 
@@ -511,17 +486,20 @@ class AsyncR2IndexClient:
     async def upload(
         self,
         bucket: str,
-        local_path: str | Path,
+        source: str | Path,
         category: str,
         entity: str,
-        remote_path: str,
-        remote_filename: str,
-        remote_version: str,
+        extension: str,
+        media_type: str,
+        destination_path: str,
+        destination_filename: str,
+        destination_version: str,
         name: str | None = None,
         tags: list[str] | None = None,
         extra: dict[str, Any] | None = None,
         content_type: str | None = None,
         progress_callback: Callable[[int], None] | None = None,
+        create_checksum_files: bool = False,
     ) -> FileRecord:
         """
         Upload a file to R2 and register it with the r2index API asynchronously.
@@ -529,21 +507,26 @@ class AsyncR2IndexClient:
         This is a convenience method that performs the full pipeline:
         1. Compute checksums (streaming, memory efficient)
         2. Upload to R2 (multipart for large files)
-        3. Register with r2index API
+        3. Optionally upload checksum files (.md5, .sha1, .sha256, .sha512)
+        4. Register with r2index API
 
         Args:
             bucket: The S3/R2 bucket name.
-            local_path: Local path to the file to upload.
+            source: Local path to the file to upload.
             category: File category.
             entity: File entity.
-            remote_path: Remote path in R2 (e.g., "/data/files").
-            remote_filename: Remote filename in R2.
-            remote_version: Version identifier.
+            extension: File extension (e.g., "zip", "tar.gz").
+            media_type: MIME type (e.g., "application/zip").
+            destination_path: Path in R2 (e.g., "/data/files").
+            destination_filename: Filename in R2.
+            destination_version: Version identifier.
             name: Optional display name.
             tags: Optional list of tags.
             extra: Optional extra metadata.
             content_type: Optional content type for R2.
             progress_callback: Optional callback for upload progress.
+            create_checksum_files: If True, upload checksum files alongside the main
+                file (e.g., file.txt.md5, file.txt.sha256).
 
         Returns:
             The created FileRecord.
@@ -552,40 +535,59 @@ class AsyncR2IndexClient:
             R2IndexError: If R2 config is not provided.
             UploadError: If upload fails.
         """
-        local_path = Path(local_path)
-        uploader = self._get_storage()
+        source_path = Path(source)
+        storage = self._get_storage()
 
         # Step 1: Compute checksums
-        checksums = await compute_checksums_async(local_path)
+        checksums = await compute_checksums_async(source_path)
 
         # Step 2: Build R2 object key
-        object_key = f"{remote_path.strip('/')}/{remote_filename}"
+        object_key = f"{destination_path.strip('/')}/{destination_version}/{destination_filename}"
 
         # Step 3: Upload to R2
-        await uploader.upload_file(
-            local_path,
+        await storage.upload_file(
+            source_path,
             bucket,
             object_key,
             content_type=content_type,
             progress_callback=progress_callback,
         )
 
-        # Step 4: Register with API
+        # Step 4: Upload checksum files if requested
+        if create_checksum_files:
+            checksum_files = [
+                ("md5", checksums.md5),
+                ("sha1", checksums.sha1),
+                ("sha256", checksums.sha256),
+                ("sha512", checksums.sha512),
+            ]
+            for ext, value in checksum_files:
+                checksum_key = f"{object_key}.{ext}"
+                await storage.upload_bytes(
+                    f"{value}  {destination_filename}\n".encode("utf-8"),
+                    bucket,
+                    checksum_key,
+                    content_type="text/plain",
+                )
+
+        # Step 5: Register with API
         create_request = FileCreateRequest(
             bucket=bucket,
             category=category,
             entity=entity,
-            remote_path=remote_path,
-            remote_filename=remote_filename,
-            remote_version=remote_version,
+            extension=extension,
+            media_type=media_type,
+            remote_path=destination_path,
+            remote_filename=destination_filename,
+            remote_version=destination_version,
             name=name,
             tags=tags,
             extra=extra,
             size=checksums.size,
-            md5=checksums.md5,
-            sha1=checksums.sha1,
-            sha256=checksums.sha256,
-            sha512=checksums.sha512,
+            checksum_md5=checksums.md5,
+            checksum_sha1=checksums.sha1,
+            checksum_sha256=checksums.sha256,
+            checksum_sha512=checksums.sha512,
         )
 
         return await self.create(create_request)
@@ -599,7 +601,9 @@ class AsyncR2IndexClient:
     async def download(
         self,
         bucket: str,
-        object_id: str,
+        source_path: str,
+        source_filename: str,
+        source_version: str,
         destination: str | Path,
         ip_address: str | None = None,
         user_agent: str | None = None,
@@ -610,18 +614,15 @@ class AsyncR2IndexClient:
         Download a file from R2 and record the download in the index asynchronously.
 
         This is a convenience method that performs:
-        1. Parse object_id into remote_path, remote_version, remote_filename
-        2. Fetch file record from the API using these components
-        3. Download the file from R2
-        4. Record the download in the index for analytics
+        1. Fetch file record from the API
+        2. Download the file from R2
+        3. Record the download in the index for analytics
 
         Args:
             bucket: The S3/R2 bucket name.
-            object_id: Full S3 object path in format: /path/to/object/version/filename
-                Example: /releases/myapp/v1/myapp.zip
-                - remote_path: /releases/myapp
-                - remote_version: v1
-                - remote_filename: myapp.zip
+            source_path: Path in R2 (e.g., "/releases/myapp").
+            source_filename: Filename in R2 (e.g., "myapp.zip").
+            source_version: Version identifier (e.g., "v1").
             destination: Local path where the file will be saved.
             ip_address: IP address of the downloader. If not provided, fetched
                 from checkip.amazonaws.com.
@@ -634,7 +635,6 @@ class AsyncR2IndexClient:
 
         Raises:
             R2IndexError: If R2 config is not provided.
-            ValueError: If object_id format is invalid.
             NotFoundError: If the file is not found in the index.
             DownloadError: If download fails.
         """
@@ -646,14 +646,17 @@ class AsyncR2IndexClient:
         if user_agent is None:
             user_agent = DEFAULT_USER_AGENT
 
-        # Step 1: Parse object_id into components
-        remote_tuple = _parse_object_id(object_id, bucket)
-
-        # Step 2: Get file record by tuple
+        # Step 1: Build remote tuple and get file record
+        remote_tuple = RemoteTuple(
+            bucket=bucket,
+            remote_path=source_path,
+            remote_filename=source_filename,
+            remote_version=source_version,
+        )
         file_record = await self.get_by_tuple(remote_tuple)
 
-        # Step 3: Build R2 object key and download
-        object_key = object_id.strip("/")
+        # Step 2: Build R2 object key and download
+        object_key = f"{source_path.strip('/')}/{source_version}/{source_filename}"
         downloaded_path = await storage.download_file(
             bucket,
             object_key,
@@ -662,9 +665,12 @@ class AsyncR2IndexClient:
             transfer_config=transfer_config,
         )
 
-        # Step 4: Record the download
+        # Step 3: Record the download
         download_request = DownloadRecordRequest(
-            file_id=file_record.id,
+            bucket=bucket,
+            remote_path=source_path,
+            remote_filename=source_filename,
+            remote_version=source_version,
             ip_address=ip_address,
             user_agent=user_agent,
         )
@@ -672,17 +678,25 @@ class AsyncR2IndexClient:
 
         return downloaded_path, file_record
 
-    async def delete_from_r2(self, bucket: str, object_id: str) -> None:
+    async def delete_from_r2(
+        self,
+        bucket: str,
+        path: str,
+        filename: str,
+        version: str,
+    ) -> None:
         """
         Delete an object from R2 storage.
 
         Args:
             bucket: The S3/R2 bucket name.
-            object_id: Full S3 object path (e.g., /path/to/object/version/filename).
+            path: Path in R2 (e.g., "/releases/myapp").
+            filename: Filename in R2 (e.g., "myapp.zip").
+            version: Version identifier (e.g., "v1").
 
         Raises:
             R2IndexError: If R2 config is not provided or deletion fails.
         """
         storage = self._get_storage()
-        object_key = object_id.strip("/")
+        object_key = f"{path.strip('/')}/{version}/{filename}"
         await storage.delete_object(bucket, object_key)

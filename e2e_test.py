@@ -19,6 +19,8 @@ import httpx
 
 from elaunira.r2index import (
     R2IndexClient,
+    R2Config,
+    R2Storage,
     FileCreateRequest,
     FileUpdateRequest,
     RemoteTuple,
@@ -94,6 +96,7 @@ class E2ETest:
             self.test_maintenance()
             if self.r2_enabled:
                 self.test_upload_download()
+                self.test_checksum_files()
                 self.test_large_file_upload()
         finally:
             self.client.close()
@@ -126,7 +129,7 @@ class E2ETest:
         # Test without auth (empty token causes invalid header or auth error)
         try:
             bad_client = R2IndexClient(index_api_url=self.api_url, index_api_token="")
-            bad_client.list()
+            bad_client.list_files()
             bad_client.close()
             self.fail_test("Should reject empty token")
         except (AuthenticationError, httpx.LocalProtocolError):
@@ -136,7 +139,7 @@ class E2ETest:
         # Test with wrong token
         try:
             bad_client = R2IndexClient(index_api_url=self.api_url, index_api_token="wrong-token")
-            bad_client.list()
+            bad_client.list_files()
             bad_client.close()
             self.fail_test("Should reject invalid token")
         except AuthenticationError:
@@ -146,7 +149,7 @@ class E2ETest:
 
         # Test with valid token
         try:
-            self.client.list()
+            self.client.list_files()
             self.pass_test("Accepts valid token (200)")
         except Exception as e:
             self.fail_test("Valid token test", str(e))
@@ -207,21 +210,21 @@ class E2ETest:
 
         # List files with filters
         try:
-            self.client.list(category="e2e-test")
+            self.client.list_files(category="e2e-test")
             self.pass_test("GET /files?category= - List with filter")
         except Exception as e:
             self.fail_test("GET /files?category=", str(e))
 
         # List files with bucket filter
         try:
-            self.client.list(bucket="e2e-test-bucket")
+            self.client.list_files(bucket="e2e-test-bucket")
             self.pass_test("GET /files?bucket= - List with bucket filter")
         except Exception as e:
             self.fail_test("GET /files?bucket=", str(e))
 
         # List files with tags filter
         try:
-            self.client.list(tags=["e2e", "test"])
+            self.client.list_files(tags=["e2e", "test"])
             self.pass_test("GET /files?tags= - List with tags filter")
         except Exception as e:
             self.fail_test("GET /files?tags=", str(e))
@@ -401,7 +404,6 @@ class E2ETest:
         bucket = "r2index-e2e-tests"
         version = datetime.now(timezone.utc).strftime("%Y%m%d-%H%M%S")
         uploaded_record = None
-        r2_object_id = f"/e2e-tests/{version}/upload-test.txt"
 
         # Create a temporary test file
         with tempfile.NamedTemporaryFile(mode="w", suffix=".txt", delete=False) as f:
@@ -414,14 +416,14 @@ class E2ETest:
             try:
                 uploaded_record = self.client.upload(
                     bucket=bucket,
-                    local_path=test_file_path,
+                    source=test_file_path,
                     category="e2e-test",
                     entity="upload-test",
                     extension="txt",
                     media_type="text/plain",
-                    remote_path="/e2e-tests",
-                    remote_filename="upload-test.txt",
-                    remote_version=version,
+                    destination_path="/e2e-tests",
+                    destination_filename="upload-test.txt",
+                    destination_version=version,
                     name="E2E Upload Test",
                     tags=["e2e", "upload"],
                 )
@@ -438,7 +440,9 @@ class E2ETest:
                 try:
                     download_path, download_record = self.client.download(
                         bucket=bucket,
-                        object_id=r2_object_id,
+                        source_path="/e2e-tests",
+                        source_filename="upload-test.txt",
+                        source_version=version,
                         destination=Path(tmpdir) / "downloaded.txt",
                     )
                     if download_path.exists() and download_record.id == uploaded_record.id:
@@ -450,7 +454,12 @@ class E2ETest:
 
             # Test cleanup: delete from R2
             try:
-                self.client.delete_from_r2(bucket, r2_object_id)
+                self.client.delete_from_r2(
+                    bucket=bucket,
+                    path="/e2e-tests",
+                    filename="upload-test.txt",
+                    version=version,
+                )
                 self.pass_test("Delete file from R2")
             except Exception as e:
                 self.fail_test("Delete file from R2", str(e))
@@ -469,7 +478,128 @@ class E2ETest:
             # Fallback cleanup if tests failed
             if uploaded_record:
                 try:
-                    self.client.delete_from_r2(bucket, r2_object_id)
+                    self.client.delete_from_r2(
+                        bucket=bucket,
+                        path="/e2e-tests",
+                        filename="upload-test.txt",
+                        version=version,
+                    )
+                except Exception:
+                    pass
+                try:
+                    self.client.delete(uploaded_record.id)
+                except Exception:
+                    pass
+
+    def test_checksum_files(self) -> None:
+        self.section("Checksum Files Upload")
+
+        bucket = "r2index-e2e-tests"
+        version = datetime.now(timezone.utc).strftime("%Y%m%d-%H%M%S")
+        uploaded_record = None
+        checksum_exts = ["md5", "sha1", "sha256", "sha512"]
+
+        # Create a temporary test file
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".txt", delete=False) as f:
+            f.write(f"E2E checksum test file created at {datetime.now(timezone.utc).isoformat()}\n")
+            test_file_path = Path(f.name)
+
+        try:
+            # Test upload with checksum files
+            try:
+                uploaded_record = self.client.upload(
+                    bucket=bucket,
+                    source=test_file_path,
+                    category="e2e-test",
+                    entity="checksum-test",
+                    extension="txt",
+                    media_type="text/plain",
+                    destination_path="/e2e-tests",
+                    destination_filename="checksum-test.txt",
+                    destination_version=version,
+                    name="E2E Checksum Test",
+                    tags=["e2e", "checksum"],
+                    create_checksum_files=True,
+                )
+                self.pass_test(f"Upload file with checksum files (id: {uploaded_record.id})")
+            except Exception as e:
+                self.fail_test("Upload file with checksum files", str(e))
+                return
+
+            # Verify checksum files exist and have correct content
+            storage = self.client._get_storage()
+            object_key = f"e2e-tests/{version}/checksum-test.txt"
+
+            for ext in checksum_exts:
+                checksum_key = f"{object_key}.{ext}"
+                try:
+                    if storage.object_exists(bucket, checksum_key):
+                        self.pass_test(f"Checksum file exists: .{ext}")
+                    else:
+                        self.fail_test(f"Checksum file exists: .{ext}", "File not found")
+                except Exception as e:
+                    self.fail_test(f"Checksum file exists: .{ext}", str(e))
+
+            # Download and verify one checksum file content
+            with tempfile.TemporaryDirectory() as tmpdir:
+                try:
+                    md5_path = Path(tmpdir) / "checksum.md5"
+                    storage.download_file(bucket, f"{object_key}.md5", md5_path)
+                    content = md5_path.read_text()
+                    # Format should be: "<checksum>  <filename>\n"
+                    if uploaded_record.checksum_md5 in content and "checksum-test.txt" in content:
+                        self.pass_test("Checksum file content is correct")
+                    else:
+                        self.fail_test("Checksum file content", f"Unexpected content: {content}")
+                except Exception as e:
+                    self.fail_test("Checksum file content", str(e))
+
+            # Cleanup: delete checksum files from R2
+            for ext in checksum_exts:
+                try:
+                    storage.delete_object(bucket, f"{object_key}.{ext}")
+                except Exception:
+                    pass
+
+            # Cleanup: delete main file from R2
+            try:
+                self.client.delete_from_r2(
+                    bucket=bucket,
+                    path="/e2e-tests",
+                    filename="checksum-test.txt",
+                    version=version,
+                )
+                self.pass_test("Delete checksum test files from R2")
+            except Exception as e:
+                self.fail_test("Delete checksum test files from R2", str(e))
+
+            # Cleanup: delete from index
+            try:
+                self.client.delete(uploaded_record.id)
+                self.pass_test("Delete checksum test from index")
+                uploaded_record = None
+            except Exception as e:
+                self.fail_test("Delete checksum test from index", str(e))
+
+        finally:
+            # Cleanup local temp file
+            test_file_path.unlink(missing_ok=True)
+            # Fallback cleanup if tests failed
+            if uploaded_record:
+                storage = self.client._get_storage()
+                object_key = f"e2e-tests/{version}/checksum-test.txt"
+                for ext in checksum_exts:
+                    try:
+                        storage.delete_object(bucket, f"{object_key}.{ext}")
+                    except Exception:
+                        pass
+                try:
+                    self.client.delete_from_r2(
+                        bucket=bucket,
+                        path="/e2e-tests",
+                        filename="checksum-test.txt",
+                        version=version,
+                    )
                 except Exception:
                     pass
                 try:
@@ -483,7 +613,6 @@ class E2ETest:
         bucket = "r2index-e2e-tests"
         version = datetime.now(timezone.utc).strftime("%Y%m%d-%H%M%S")
         uploaded_record = None
-        r2_object_id = f"/e2e-tests/{version}/large-test-file.bin"
         file_size = 5 * 1024 * 1024 * 1024  # 5GB
         chunk_size = 64 * 1024 * 1024  # 64MB chunks for generation
 
@@ -521,14 +650,14 @@ class E2ETest:
                     print("  Starting upload...")
                     uploaded_record = self.client.upload(
                         bucket=bucket,
-                        local_path=test_file_path,
+                        source=test_file_path,
                         category="e2e-test",
                         entity="large-file-test",
                         extension="bin",
                         media_type="application/octet-stream",
-                        remote_path="/e2e-tests",
-                        remote_filename="large-test-file.bin",
-                        remote_version=version,
+                        destination_path="/e2e-tests",
+                        destination_filename="large-test-file.bin",
+                        destination_version=version,
                         name="E2E Large File Test",
                         tags=["e2e", "large-file"],
                         progress_callback=upload_progress,
@@ -552,7 +681,9 @@ class E2ETest:
                     print("  Starting download...")
                     downloaded_file, _ = self.client.download(
                         bucket=bucket,
-                        object_id=r2_object_id,
+                        source_path="/e2e-tests",
+                        source_filename="large-test-file.bin",
+                        source_version=version,
                         destination=download_path,
                         progress_callback=download_progress,
                     )
@@ -581,7 +712,12 @@ class E2ETest:
 
                 # Cleanup R2
                 try:
-                    self.client.delete_from_r2(bucket, r2_object_id)
+                    self.client.delete_from_r2(
+                        bucket=bucket,
+                        path="/e2e-tests",
+                        filename="large-test-file.bin",
+                        version=version,
+                    )
                     self.pass_test("Delete large file from R2")
                 except Exception as e:
                     self.fail_test("Delete large file from R2", str(e))
@@ -598,7 +734,12 @@ class E2ETest:
                 # Fallback cleanup
                 if uploaded_record:
                     try:
-                        self.client.delete_from_r2(bucket, r2_object_id)
+                        self.client.delete_from_r2(
+                            bucket=bucket,
+                            path="/e2e-tests",
+                            filename="large-test-file.bin",
+                            version=version,
+                        )
                     except Exception:
                         pass
                     try:

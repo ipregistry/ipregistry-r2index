@@ -56,7 +56,7 @@ async def test_async_list(async_client: AsyncR2IndexClient, httpx_mock: HTTPXMoc
         },
     )
 
-    response = await async_client.list()
+    response = await async_client.list_files()
     assert len(response.files) == 1
     await async_client.close()
 

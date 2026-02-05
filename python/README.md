@@ -26,22 +26,25 @@ client = R2IndexClient(
 # Upload and register a file
 record = client.upload(
     bucket="my-bucket",
-    local_path="./myfile.zip",
+    source="./myfile.zip",
     category="software",
     entity="myapp",
     extension="zip",
     media_type="application/zip",
-    remote_path="/releases/myapp",
-    remote_filename="myapp.zip",
-    remote_version="v1",
+    destination_path="/releases/myapp",
+    destination_filename="myapp.zip",
+    destination_version="v1",
     tags=["release", "stable"],
+    create_checksum_files=True,  # Creates .md5, .sha1, .sha256, .sha512 files
 )
 
 # Download a file and record the download
 # IP address is auto-detected, user agent defaults to "elaunira-r2index/<version>"
 path, record = client.download(
     bucket="my-bucket",
-    object_id="/releases/myapp/v1/myapp.zip",
+    source_path="/releases/myapp",
+    source_filename="myapp.zip",
+    source_version="v1",
     destination="./downloads/myfile.zip",
 )
 ```
@@ -61,21 +64,23 @@ async with AsyncR2IndexClient(
     # Upload
     record = await client.upload(
         bucket="my-bucket",
-        local_path="./myfile.zip",
+        source="./myfile.zip",
         category="software",
         entity="myapp",
         extension="zip",
         media_type="application/zip",
-        remote_path="/releases/myapp",
-        remote_filename="myapp.zip",
-        remote_version="v1",
+        destination_path="/releases/myapp",
+        destination_filename="myapp.zip",
+        destination_version="v1",
         tags=["release", "stable"],
     )
 
     # Download
     path, record = await client.download(
         bucket="my-bucket",
-        object_id="/releases/myapp/v1/myapp.zip",
+        source_path="/releases/myapp",
+        source_filename="myapp.zip",
+        source_version="v1",
         destination="./downloads/myfile.zip",
     )
 ```
@@ -105,7 +110,9 @@ transfer_config = R2TransferConfig(
 
 path, record = client.download(
     bucket="my-bucket",
-    object_id="/data/files/v2/largefile.zip",
+    source_path="/data/files",
+    source_filename="largefile.zip",
+    source_version="v2",
     destination="./downloads/largefile.zip",
     transfer_config=transfer_config,
 )
@@ -121,7 +128,9 @@ def on_progress(bytes_transferred: int) -> None:
 
 path, record = client.download(
     bucket="my-bucket",
-    object_id="/releases/myapp/v1/myapp.zip",
+    source_path="/releases/myapp",
+    source_filename="myapp.zip",
+    source_version="v1",
     destination="./downloads/myfile.zip",
     progress_callback=on_progress,
 )
@@ -133,7 +142,9 @@ path, record = client.download(
 # Delete from R2 storage
 client.delete_from_r2(
     bucket="my-bucket",
-    object_id="/releases/myapp/v1/myapp.zip",
+    path="/releases/myapp",
+    filename="myapp.zip",
+    version="v1",
 )
 
 # Delete from index (metadata only)

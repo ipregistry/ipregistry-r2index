@@ -65,7 +65,7 @@ def test_list(client: R2IndexClient, httpx_mock: HTTPXMock):
         },
     )
 
-    response = client.list()
+    response = client.list_files()
     assert len(response.files) == 1
     assert response.files[0].id == "file1"
 
@@ -77,7 +77,7 @@ def test_list_with_filters(client: R2IndexClient, httpx_mock: HTTPXMock):
         json={"files": [], "total": 0},
     )
 
-    response = client.list(
+    response = client.list_files(
         category="software",
         entity="myapp",
         tags=["release", "stable"],
@@ -183,7 +183,7 @@ def test_authentication_error(client: R2IndexClient, httpx_mock: HTTPXMock):
     )
 
     with pytest.raises(AuthenticationError) as exc_info:
-        client.list()
+        client.list_files()
 
     assert exc_info.value.status_code == 401
 

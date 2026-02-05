@@ -146,6 +146,47 @@ class R2Storage:
         except Exception as e:
             raise UploadError(f"Failed to delete object from R2: {e}") from e
 
+    def upload_bytes(
+        self,
+        data: bytes,
+        bucket: str,
+        object_key: str,
+        content_type: str | None = None,
+    ) -> str:
+        """
+        Upload bytes directly to R2.
+
+        Args:
+            data: The bytes to upload.
+            bucket: The R2 bucket name.
+            object_key: The key (path) to store the object under in R2.
+            content_type: Optional content type for the object.
+
+        Returns:
+            The object key of the uploaded data.
+
+        Raises:
+            UploadError: If the upload fails.
+        """
+        try:
+            if content_type:
+                self._client.put_object(
+                    Bucket=bucket,
+                    Key=object_key,
+                    Body=data,
+                    ContentType=content_type,
+                )
+            else:
+                self._client.put_object(
+                    Bucket=bucket,
+                    Key=object_key,
+                    Body=data,
+                )
+        except Exception as e:
+            raise UploadError(f"Failed to upload bytes to R2: {e}") from e
+
+        return object_key
+
     def object_exists(self, bucket: str, object_key: str) -> bool:
         """
         Check if an object exists in R2.
