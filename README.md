@@ -25,7 +25,7 @@ npm install
 ### 2. Create D1 database
 
 ```bash
-wrangler d1 create r2-index
+wrangler d1 create r2index
 ```
 
 Update `wrangler.toml` with the returned `database_id`.
@@ -53,7 +53,7 @@ npm run deploy
 ### wrangler.toml
 
 ```toml
-name = "r2-index"
+name = "r2index"
 main = "src/index.ts"
 compatibility_date = "2026-01-31"
 
@@ -63,7 +63,7 @@ routes = [
 
 [[d1_databases]]
 binding = "DB"
-database_name = "r2-index"
+database_name = "r2index"
 database_id = "<your-database-id>"
 
 [vars]
