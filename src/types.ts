@@ -1,8 +1,8 @@
 export interface Env {
-  R2INDEX_API_TOKEN: string;
   CACHE_MAX_AGE?: string;
   D1: D1Database;
   DOWNLOADS_RETENTION_DAYS?: string; // Days to keep download records (default: no limit)
+  R2INDEX_API_TOKEN: string;
 }
 
 export interface Variables {
