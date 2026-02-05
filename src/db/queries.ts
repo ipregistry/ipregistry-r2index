@@ -127,6 +127,26 @@ export async function getFileById(db: D1Database, id: string): Promise<FileRecor
   return file;
 }
 
+export async function getFileByRemote(
+  db: D1Database,
+  bucket: string,
+  remotePath: string,
+  remoteFilename: string,
+  remoteVersion: string
+): Promise<FileRecord | null> {
+  const raw = await db.prepare(
+    'SELECT * FROM files WHERE bucket = ? AND remote_path = ? AND remote_filename = ? AND remote_version = ?'
+  ).bind(bucket, remotePath, remoteFilename, remoteVersion).first<FileRecordRaw>();
+
+  if (!raw) return null;
+
+  const file = parseRecord(raw);
+  const tags = await db.prepare('SELECT tag FROM file_tags WHERE file_id = ?').bind(file.id).all<{ tag: string }>();
+  file.tags = tags.results.map(t => t.tag);
+
+  return file;
+}
+
 export async function createFile(db: D1Database, input: CreateFileInput): Promise<FileRecord> {
   const id = crypto.randomUUID();
   const now = Date.now();

@@ -46,7 +46,11 @@ app.get('/timeseries', async (c) => {
   );
 
   c.header('Cache-Control', `public, max-age=${getCacheMaxAge(c)}`);
-  return c.json({ scale: scale || 'day', data });
+  return c.json({
+    buckets: data,
+    period: { start: parseInt(start, 10), end: parseInt(end, 10) },
+    scale: scale || 'day',
+  });
 });
 
 // Get summary stats
@@ -117,7 +121,10 @@ app.get('/user-agents', async (c) => {
   );
 
   c.header('Cache-Control', `public, max-age=${getCacheMaxAge(c)}`);
-  return c.json({ data });
+  return c.json({
+    user_agents: data,
+    period: { start: parseInt(start, 10), end: parseInt(end, 10) },
+  });
 });
 
 export default app;

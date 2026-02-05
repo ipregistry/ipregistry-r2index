@@ -128,7 +128,7 @@ describe('GET /analytics/timeseries', () => {
     expect(response.status).toBe(200);
     const data = await response.json() as {
       scale: string;
-      data: {
+      buckets: {
         timestamp: number;
         files: { remote_path: string; remote_filename: string; remote_version: string; downloads: number; unique_downloads: number }[];
         total_downloads: number;
@@ -136,12 +136,12 @@ describe('GET /analytics/timeseries', () => {
       }[];
     };
     expect(data.scale).toBe('day');
-    expect(data.data.length).toBeGreaterThan(0);
-    expect(data.data[0].total_downloads).toBe(5);
-    expect(data.data[0].total_unique_downloads).toBe(5);
-    expect(data.data[0].files.length).toBe(1);
-    expect(data.data[0].files[0].remote_path).toBe('/uploads/documents');
-    expect(data.data[0].files[0].downloads).toBe(5);
+    expect(data.buckets.length).toBeGreaterThan(0);
+    expect(data.buckets[0].total_downloads).toBe(5);
+    expect(data.buckets[0].total_unique_downloads).toBe(5);
+    expect(data.buckets[0].files.length).toBe(1);
+    expect(data.buckets[0].files[0].remote_path).toBe('/uploads/documents');
+    expect(data.buckets[0].files[0].downloads).toBe(5);
   });
 
   it('returns time series with hourly scale', async () => {
@@ -154,7 +154,7 @@ describe('GET /analytics/timeseries', () => {
       { headers: createAuthHeaders() }
     );
     expect(response.status).toBe(200);
-    const data = await response.json() as { scale: string; data: unknown[] };
+    const data = await response.json() as { scale: string; buckets: unknown[] };
     expect(data.scale).toBe('hour');
   });
 
@@ -171,9 +171,9 @@ describe('GET /analytics/timeseries', () => {
       `http://localhost/analytics/timeseries?start=${now - 86400000}&end=${now + 86400000}&scale=day&remote_filename=report.pdf`,
       { headers: createAuthHeaders() }
     );
-    const data = await response.json() as { data: { total_downloads: number; files: unknown[] }[] };
-    expect(data.data[0].total_downloads).toBe(5); // Only original file
-    expect(data.data[0].files.length).toBe(1);
+    const data = await response.json() as { buckets: { total_downloads: number; files: unknown[] }[] };
+    expect(data.buckets[0].total_downloads).toBe(5); // Only original file
+    expect(data.buckets[0].files.length).toBe(1);
   });
 
   it('includes Cache-Control header', async () => {
@@ -298,11 +298,11 @@ describe('GET /analytics/user-agents', () => {
       { headers: createAuthHeaders() }
     );
     expect(response.status).toBe(200);
-    const data = await response.json() as { data: { user_agent: string; downloads: number; unique_ips: number }[] };
-    expect(data.data.length).toBe(3);
-    expect(data.data[0].user_agent).toBe('Chrome/120');
-    expect(data.data[0].downloads).toBe(2);
-    expect(data.data[0].unique_ips).toBe(2);
+    const data = await response.json() as { user_agents: { user_agent: string; downloads: number; unique_ips: number }[] };
+    expect(data.user_agents.length).toBe(3);
+    expect(data.user_agents[0].user_agent).toBe('Chrome/120');
+    expect(data.user_agents[0].downloads).toBe(2);
+    expect(data.user_agents[0].unique_ips).toBe(2);
   });
 
   it('respects limit parameter', async () => {
@@ -311,8 +311,8 @@ describe('GET /analytics/user-agents', () => {
       `http://localhost/analytics/user-agents?start=${now - 86400000}&end=${now + 86400000}&limit=2`,
       { headers: createAuthHeaders() }
     );
-    const data = await response.json() as { data: unknown[] };
-    expect(data.data.length).toBe(2);
+    const data = await response.json() as { user_agents: unknown[] };
+    expect(data.user_agents.length).toBe(2);
   });
 
   it('filters by file', async () => {
@@ -328,8 +328,8 @@ describe('GET /analytics/user-agents', () => {
       `http://localhost/analytics/user-agents?start=${now - 86400000}&end=${now + 86400000}&remote_filename=report.pdf`,
       { headers: createAuthHeaders() }
     );
-    const data = await response.json() as { data: { user_agent: string }[] };
-    expect(data.data.find(d => d.user_agent === 'Edge/120')).toBeUndefined();
+    const data = await response.json() as { user_agents: { user_agent: string }[] };
+    expect(data.user_agents.find(d => d.user_agent === 'Edge/120')).toBeUndefined();
   });
 });
 
@@ -371,8 +371,8 @@ describe('Analytics - file id inclusion', () => {
       `http://localhost/analytics/timeseries?start=${now - 86400000}&end=${now + 86400000}&scale=day`,
       { headers: createAuthHeaders() }
     );
-    const data = await response.json() as { data: { files: { id: string | null }[] }[] };
-    expect(data.data[0].files[0].id).toBe(file.id);
+    const data = await response.json() as { buckets: { files: { id: string | null }[] }[] };
+    expect(data.buckets[0].files[0].id).toBe(file.id);
   });
 
   it('returns null id when file does not exist in index', async () => {
@@ -388,8 +388,8 @@ describe('Analytics - file id inclusion', () => {
       `http://localhost/analytics/timeseries?start=${now - 86400000}&end=${now + 86400000}&scale=day`,
       { headers: createAuthHeaders() }
     );
-    const data = await response.json() as { data: { files: { id: string | null }[] }[] };
-    expect(data.data[0].files[0].id).toBeNull();
+    const data = await response.json() as { buckets: { files: { id: string | null }[] }[] };
+    expect(data.buckets[0].files[0].id).toBeNull();
   });
 });
 
@@ -419,18 +419,18 @@ describe('Analytics - multiple files', () => {
       { headers: createAuthHeaders() }
     );
     const data = await response.json() as {
-      data: {
+      buckets: {
         files: { remote_filename: string; downloads: number; unique_downloads: number }[];
         total_downloads: number;
         total_unique_downloads: number;
       }[];
     };
 
-    expect(data.data[0].files.length).toBe(2);
-    expect(data.data[0].total_downloads).toBe(3);
+    expect(data.buckets[0].files.length).toBe(2);
+    expect(data.buckets[0].total_downloads).toBe(3);
     // file1.pdf has 2 downloads from 2 unique IPs, file2.pdf has 1 download
-    const file1 = data.data[0].files.find(f => f.remote_filename === 'file1.pdf');
-    const file2 = data.data[0].files.find(f => f.remote_filename === 'file2.pdf');
+    const file1 = data.buckets[0].files.find(f => f.remote_filename === 'file1.pdf');
+    const file2 = data.buckets[0].files.find(f => f.remote_filename === 'file2.pdf');
     expect(file1?.downloads).toBe(2);
     expect(file1?.unique_downloads).toBe(2);
     expect(file2?.downloads).toBe(1);
@@ -449,11 +449,11 @@ describe('Analytics - multiple files', () => {
       `http://localhost/analytics/timeseries?start=${now - 86400000}&end=${now + 86400000}&scale=day`,
       { headers: createAuthHeaders() }
     );
-    const data = await response.json() as { data: { total_downloads: number; total_unique_downloads: number }[] };
+    const data = await response.json() as { buckets: { total_downloads: number; total_unique_downloads: number }[] };
 
-    expect(data.data[0].total_downloads).toBe(4);
+    expect(data.buckets[0].total_downloads).toBe(4);
     // 3 unique IPs total (192.168.1.1 downloaded 2 files, 10.0.0.1 and 10.0.0.2 each downloaded 1)
-    expect(data.data[0].total_unique_downloads).toBe(3);
+    expect(data.buckets[0].total_unique_downloads).toBe(3);
   });
 });
 
@@ -477,10 +477,10 @@ describe('Analytics - time scales', () => {
       `http://localhost/analytics/timeseries?start=${now - 86400000 * 30}&end=${now + 86400000}&scale=month`,
       { headers: createAuthHeaders() }
     );
-    const data = await response.json() as { scale: string; data: { timestamp: number }[] };
+    const data = await response.json() as { scale: string; buckets: { timestamp: number }[] };
 
     expect(data.scale).toBe('month');
-    expect(data.data[0].timestamp).toBe(expectedMonth);
+    expect(data.buckets[0].timestamp).toBe(expectedMonth);
   });
 
   it('defaults to daily scale', async () => {
@@ -545,8 +545,8 @@ describe('Analytics - validation', () => {
       { headers: createAuthHeaders() }
     );
     expect(response.status).toBe(200);
-    const data = await response.json() as { data: unknown[] };
-    expect(data.data).toEqual([]);
+    const data = await response.json() as { buckets: unknown[] };
+    expect(data.buckets).toEqual([]);
   });
 });
 
@@ -681,12 +681,12 @@ describe('Analytics - files limit', () => {
       `http://localhost/analytics/timeseries?start=${now - 86400000}&end=${now + 86400000}&scale=day&limit=3`,
       { headers: createAuthHeaders() }
     );
-    const data = await response.json() as { data: { files: unknown[]; total_downloads: number }[] };
+    const data = await response.json() as { buckets: { files: unknown[]; total_downloads: number }[] };
 
     // Should only return 3 files per bucket
-    expect(data.data[0].files.length).toBe(3);
+    expect(data.buckets[0].files.length).toBe(3);
     // But total_downloads should still count all downloads
-    expect(data.data[0].total_downloads).toBe(55); // Sum of 10+9+8+...+1 = 55
+    expect(data.buckets[0].total_downloads).toBe(55); // Sum of 10+9+8+...+1 = 55
   });
 
   it('returns files ordered by downloads descending', async () => {
@@ -695,9 +695,9 @@ describe('Analytics - files limit', () => {
       `http://localhost/analytics/timeseries?start=${now - 86400000}&end=${now + 86400000}&scale=day&limit=5`,
       { headers: createAuthHeaders() }
     );
-    const data = await response.json() as { data: { files: { downloads: number }[] }[] };
+    const data = await response.json() as { buckets: { files: { downloads: number }[] }[] };
 
-    const files = data.data[0].files;
+    const files = data.buckets[0].files;
     for (let i = 0; i < files.length - 1; i++) {
       expect(files[i].downloads).toBeGreaterThanOrEqual(files[i + 1].downloads);
     }
@@ -709,10 +709,10 @@ describe('Analytics - files limit', () => {
       `http://localhost/analytics/timeseries?start=${now - 86400000}&end=${now + 86400000}&scale=day`,
       { headers: createAuthHeaders() }
     );
-    const data = await response.json() as { data: { files: unknown[] }[] };
+    const data = await response.json() as { buckets: { files: unknown[] }[] };
 
     // With only 10 files, all should be returned
-    expect(data.data[0].files.length).toBe(10);
+    expect(data.buckets[0].files.length).toBe(10);
   });
 
   it('enforces max limit of 1000', async () => {
@@ -775,8 +775,8 @@ describe('POST /maintenance/cleanup-downloads', () => {
     });
 
     expect(response.status).toBe(200);
-    const data = await response.json() as { deleted: number; retention_days: number };
-    expect(data.deleted).toBe(1);
+    const data = await response.json() as { deleted_count: number; retention_days: number };
+    expect(data.deleted_count).toBe(1);
     expect(data.retention_days).toBe(365);
 
     // Verify only 1 download remains
@@ -798,7 +798,7 @@ describe('POST /maintenance/cleanup-downloads', () => {
     });
 
     expect(response.status).toBe(200);
-    const data = await response.json() as { deleted: number };
-    expect(data.deleted).toBe(0);
+    const data = await response.json() as { deleted_count: number };
+    expect(data.deleted_count).toBe(0);
   });
 });

@@ -59,7 +59,7 @@ app.post('/maintenance/cleanup-downloads', async (c) => {
   }
 
   const deleted = await cleanupOldDownloads(c.env.D1, retentionDays);
-  return c.json({ deleted, retention_days: retentionDays });
+  return c.json({ deleted_count: deleted, retention_days: retentionDays });
 });
 
 export default app;

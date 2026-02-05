@@ -1,6 +1,6 @@
 import { Context, Hono } from 'hono';
 import type { Env, SearchParams } from '../types';
-import { getFileById, updateFile, deleteFile, deleteFileByRemote, searchFiles, upsertFile, getNestedIndex } from '../db/queries';
+import { getFileById, getFileByRemote, updateFile, deleteFile, deleteFileByRemote, searchFiles, upsertFile, getNestedIndex } from '../db/queries';
 import { Errors, validationError } from '../errors';
 import { createFileSchema, updateFileSchema, deleteByRemoteSchema, searchParamsSchema } from '../validation';
 
@@ -77,6 +77,31 @@ app.post('/', async (c) => {
 
   const { file, created } = await upsertFile(c.env.D1, parsed.data);
   return c.json(file, created ? 201 : 200);
+});
+
+// Get file by remote tuple
+app.get('/by-tuple', async (c) => {
+  const bucket = c.req.query('bucket');
+  const remotePath = c.req.query('remote_path');
+  const remoteFilename = c.req.query('remote_filename');
+  const remoteVersion = c.req.query('remote_version');
+
+  if (!bucket || !remotePath || !remoteFilename || !remoteVersion) {
+    return c.json(validationError({
+      bucket: !bucket ? ['bucket is required'] : [],
+      remote_path: !remotePath ? ['remote_path is required'] : [],
+      remote_filename: !remoteFilename ? ['remote_filename is required'] : [],
+      remote_version: !remoteVersion ? ['remote_version is required'] : [],
+    }), 400);
+  }
+
+  const file = await getFileByRemote(c.env.D1, bucket, remotePath, remoteFilename, remoteVersion);
+
+  if (!file) {
+    return c.json(Errors.FILE_NOT_FOUND, 404);
+  }
+
+  return c.json(file);
 });
 
 // Get nested index (grouped by entity then extension)
