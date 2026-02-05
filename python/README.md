@@ -21,7 +21,6 @@ client = R2IndexClient(
     r2_access_key_id="your-r2-access-key-id",
     r2_secret_access_key="your-r2-secret-access-key",
     r2_endpoint_url="https://your-account-id.r2.cloudflarestorage.com",
-    r2_bucket="your-bucket-name",
 )
 
 # Upload and register a file
@@ -56,7 +55,6 @@ async with AsyncR2IndexClient(
     r2_access_key_id="your-r2-access-key-id",
     r2_secret_access_key="your-r2-secret-access-key",
     r2_endpoint_url="https://your-account-id.r2.cloudflarestorage.com",
-    r2_bucket="your-bucket-name",
 ) as client:
     # Upload
     record = await client.upload_and_register(
@@ -91,7 +89,6 @@ client = R2IndexClient(
     r2_access_key_id="your-r2-access-key-id",
     r2_secret_access_key="your-r2-secret-access-key",
     r2_endpoint_url="https://your-account-id.r2.cloudflarestorage.com",
-    r2_bucket="your-bucket-name",
 )
 
 # Custom transfer settings

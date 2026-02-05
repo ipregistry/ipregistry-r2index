@@ -86,7 +86,6 @@ class AsyncR2IndexClient:
         r2_access_key_id: str | None = None,
         r2_secret_access_key: str | None = None,
         r2_endpoint_url: str | None = None,
-        r2_bucket: str | None = None,
         timeout: float = 30.0,
     ) -> None:
         """
@@ -98,7 +97,6 @@ class AsyncR2IndexClient:
             r2_access_key_id: R2 access key ID for storage operations.
             r2_secret_access_key: R2 secret access key for storage operations.
             r2_endpoint_url: R2 endpoint URL for storage operations.
-            r2_bucket: R2 bucket name for storage operations.
             timeout: Request timeout in seconds.
         """
         self.api_url = index_api_url.rstrip("/")
@@ -107,12 +105,11 @@ class AsyncR2IndexClient:
         self._storage: AsyncR2Storage | None = None
 
         # Build R2 config if credentials provided
-        if r2_access_key_id and r2_secret_access_key and r2_endpoint_url and r2_bucket:
+        if r2_access_key_id and r2_secret_access_key and r2_endpoint_url:
             self._r2_config: R2Config | None = R2Config(
                 access_key_id=r2_access_key_id,
                 secret_access_key=r2_secret_access_key,
                 endpoint_url=r2_endpoint_url,
-                bucket=r2_bucket,
             )
         else:
             self._r2_config = None
@@ -569,6 +566,7 @@ class AsyncR2IndexClient:
         # Step 3: Upload to R2
         await uploader.upload_file(
             local_path,
+            bucket,
             object_key,
             content_type=content_type,
             progress_callback=progress_callback,
@@ -659,6 +657,7 @@ class AsyncR2IndexClient:
         # Step 3: Build R2 object key and download
         object_key = object_id.strip("/")
         downloaded_path = await storage.download_file(
+            bucket,
             object_key,
             destination,
             progress_callback=progress_callback,

@@ -26,6 +26,7 @@ class AsyncR2Storage:
     async def upload_file(
         self,
         file_path: str | Path,
+        bucket: str,
         object_key: str,
         content_type: str | None = None,
         progress_callback: Callable[[int], None] | None = None,
@@ -38,6 +39,7 @@ class AsyncR2Storage:
 
         Args:
             file_path: Path to the file to upload.
+            bucket: The R2 bucket name.
             object_key: The key (path) to store the object under in R2.
             content_type: Optional content type for the object.
             progress_callback: Optional callback called with bytes uploaded so far.
@@ -78,7 +80,7 @@ class AsyncR2Storage:
 
                 await client.upload_file(
                     str(file_path),
-                    self.config.bucket,
+                    bucket,
                     object_key,
                     ExtraArgs=extra_args if extra_args else None,
                     Callback=callback,
@@ -88,11 +90,12 @@ class AsyncR2Storage:
 
         return object_key
 
-    async def delete_object(self, object_key: str) -> None:
+    async def delete_object(self, bucket: str, object_key: str) -> None:
         """
         Delete an object from R2 asynchronously.
 
         Args:
+            bucket: The R2 bucket name.
             object_key: The key of the object to delete.
 
         Raises:
@@ -106,15 +109,16 @@ class AsyncR2Storage:
                 endpoint_url=self.config.endpoint_url,
                 region_name=self.config.region,
             ) as client:
-                await client.delete_object(Bucket=self.config.bucket, Key=object_key)
+                await client.delete_object(Bucket=bucket, Key=object_key)
         except Exception as e:
             raise UploadError(f"Failed to delete object from R2: {e}") from e
 
-    async def object_exists(self, object_key: str) -> bool:
+    async def object_exists(self, bucket: str, object_key: str) -> bool:
         """
         Check if an object exists in R2 asynchronously.
 
         Args:
+            bucket: The R2 bucket name.
             object_key: The key of the object to check.
 
         Returns:
@@ -128,7 +132,7 @@ class AsyncR2Storage:
                 endpoint_url=self.config.endpoint_url,
                 region_name=self.config.region,
             ) as client:
-                await client.head_object(Bucket=self.config.bucket, Key=object_key)
+                await client.head_object(Bucket=bucket, Key=object_key)
                 return True
         except client.exceptions.ClientError as e:
             if e.response["Error"]["Code"] == "404":
@@ -137,6 +141,7 @@ class AsyncR2Storage:
 
     async def download_file(
         self,
+        bucket: str,
         object_key: str,
         file_path: str | Path,
         progress_callback: Callable[[int], None] | None = None,
@@ -146,6 +151,7 @@ class AsyncR2Storage:
         Download a file from R2 asynchronously.
 
         Args:
+            bucket: The R2 bucket name.
             object_key: The key (path) of the object in R2.
             file_path: Local path where the file will be saved.
             progress_callback: Optional callback called with bytes downloaded so far.
@@ -181,7 +187,7 @@ class AsyncR2Storage:
                     callback = _AsyncProgressCallback(progress_callback)
 
                 await client.download_file(
-                    self.config.bucket,
+                    bucket,
                     object_key,
                     str(file_path),
                     Callback=callback,

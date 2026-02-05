@@ -43,9 +43,8 @@ class R2Config:
     """Configuration for R2 storage."""
 
     access_key_id: str
-    secret_access_key: str
     endpoint_url: str
-    bucket: str
+    secret_access_key: str
     region: str = "auto"
 
 
@@ -71,6 +70,7 @@ class R2Storage:
     def upload_file(
         self,
         file_path: str | Path,
+        bucket: str,
         object_key: str,
         content_type: str | None = None,
         progress_callback: Callable[[int], None] | None = None,
@@ -83,6 +83,7 @@ class R2Storage:
 
         Args:
             file_path: Path to the file to upload.
+            bucket: The R2 bucket name.
             object_key: The key (path) to store the object under in R2.
             content_type: Optional content type for the object.
             progress_callback: Optional callback called with bytes uploaded so far.
@@ -118,7 +119,7 @@ class R2Storage:
         try:
             self._client.upload_file(
                 str(file_path),
-                self.config.bucket,
+                bucket,
                 object_key,
                 Config=boto_transfer_config,
                 ExtraArgs=extra_args if extra_args else None,
@@ -129,33 +130,35 @@ class R2Storage:
 
         return object_key
 
-    def delete_object(self, object_key: str) -> None:
+    def delete_object(self, bucket: str, object_key: str) -> None:
         """
         Delete an object from R2.
 
         Args:
+            bucket: The R2 bucket name.
             object_key: The key of the object to delete.
 
         Raises:
             UploadError: If the deletion fails.
         """
         try:
-            self._client.delete_object(Bucket=self.config.bucket, Key=object_key)
+            self._client.delete_object(Bucket=bucket, Key=object_key)
         except Exception as e:
             raise UploadError(f"Failed to delete object from R2: {e}") from e
 
-    def object_exists(self, object_key: str) -> bool:
+    def object_exists(self, bucket: str, object_key: str) -> bool:
         """
         Check if an object exists in R2.
 
         Args:
+            bucket: The R2 bucket name.
             object_key: The key of the object to check.
 
         Returns:
             True if the object exists, False otherwise.
         """
         try:
-            self._client.head_object(Bucket=self.config.bucket, Key=object_key)
+            self._client.head_object(Bucket=bucket, Key=object_key)
             return True
         except self._client.exceptions.ClientError as e:
             if e.response["Error"]["Code"] == "404":
@@ -164,6 +167,7 @@ class R2Storage:
 
     def download_file(
         self,
+        bucket: str,
         object_key: str,
         file_path: str | Path,
         progress_callback: Callable[[int], None] | None = None,
@@ -173,6 +177,7 @@ class R2Storage:
         Download a file from R2.
 
         Args:
+            bucket: The R2 bucket name.
             object_key: The key (path) of the object in R2.
             file_path: Local path where the file will be saved.
             progress_callback: Optional callback called with bytes downloaded so far.
@@ -203,7 +208,7 @@ class R2Storage:
 
         try:
             self._client.download_file(
-                self.config.bucket,
+                bucket,
                 object_key,
                 str(file_path),
                 Config=boto_transfer_config,

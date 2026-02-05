@@ -135,7 +135,6 @@ class TestDownloadAndRecord:
             r2_access_key_id="test-key",
             r2_secret_access_key="test-secret",
             r2_endpoint_url="https://r2.example.com",
-            r2_bucket="test-bucket",
         )
 
     def test_download_and_record_with_defaults(
