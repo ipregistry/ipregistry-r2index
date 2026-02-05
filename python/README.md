@@ -29,6 +29,8 @@ record = client.upload(
     local_path="./myfile.zip",
     category="software",
     entity="myapp",
+    extension="zip",
+    media_type="application/zip",
     remote_path="/releases/myapp",
     remote_filename="myapp.zip",
     remote_version="v1",
@@ -62,6 +64,8 @@ async with AsyncR2IndexClient(
         local_path="./myfile.zip",
         category="software",
         entity="myapp",
+        extension="zip",
+        media_type="application/zip",
         remote_path="/releases/myapp",
         remote_filename="myapp.zip",
         remote_version="v1",
@@ -121,6 +125,27 @@ path, record = client.download(
     destination="./downloads/myfile.zip",
     progress_callback=on_progress,
 )
+```
+
+### Deleting Files
+
+```python
+# Delete from R2 storage
+client.delete_from_r2(
+    bucket="my-bucket",
+    object_id="/releases/myapp/v1/myapp.zip",
+)
+
+# Delete from index (metadata only)
+client.delete(file_id)
+
+# Or delete by remote tuple
+client.delete_by_tuple(RemoteTuple(
+    bucket="my-bucket",
+    remote_path="/releases/myapp",
+    remote_filename="myapp.zip",
+    remote_version="v1",
+))
 ```
 
 ## License

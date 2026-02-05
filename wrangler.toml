@@ -3,16 +3,16 @@ main = "src/index.ts"
 compatibility_date = "2026-01-31"
 
 routes = [
-  { pattern = "r2index.acme.com/*", zone_name = "acme.com" }
+  { pattern = "r2index.elaunira.com/*", zone_name = "elaunira.com" }
 ]
 
 [[d1_databases]]
-binding = "DB"
+binding = "D1"
 database_name = "r2-index"
-database_id = "<to-be-created>"
+database_id = "de77f23f-0f85-403f-b483-2b3db3059b87"
 
-# API_TOKEN should be set via: wrangler secret put API_TOKEN
+# R2INDEX_API_TOKEN should be set via: wrangler secret put R2INDEX_API_TOKEN
 
 [vars]
 CACHE_MAX_AGE = "60"
-# DOWNLOADS_RETENTION_DAYS = "365"  # Days to keep download records (default: 365)
+DOWNLOADS_RETENTION_DAYS = "365"

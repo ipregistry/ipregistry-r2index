@@ -193,6 +193,31 @@ GET /files/:id
 
 **Response:** `200 OK` with file record or `404 Not Found`.
 
+### Get File by Remote Tuple
+
+```
+GET /files/by-tuple
+```
+
+Retrieves a file by its unique remote tuple.
+
+**Query Parameters:**
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `bucket` | string | Yes | S3/R2 bucket name |
+| `remote_path` | string | Yes | Directory path in R2 |
+| `remote_filename` | string | Yes | Filename in R2 |
+| `remote_version` | string | Yes | Version identifier |
+
+**Example Request:**
+
+```bash
+curl "https://r2index.acme.com/files/by-tuple?bucket=my-bucket&remote_path=acme/abuser&remote_filename=abuser.csv&remote_version=2026-02-03"
+```
+
+**Response:** `200 OK` with file record or `404 Not Found`.
+
 ### Update File
 
 ```
@@ -486,7 +511,7 @@ curl "https://r2index.acme.com/analytics/timeseries?start=1704067200000&end=1706
 ```json
 {
   "scale": "day",
-  "data": [
+  "buckets": [
     {
       "timestamp": 1704067200000,
       "files": [
@@ -512,7 +537,8 @@ curl "https://r2index.acme.com/analytics/timeseries?start=1704067200000&end=1706
       "total_downloads": 150,
       "total_unique_downloads": 45
     }
-  ]
+  ],
+  "period": { "start": 1704067200000, "end": 1706745600000 }
 }
 ```
 
@@ -611,10 +637,11 @@ curl "https://r2index.acme.com/analytics/user-agents?start=1704067200000&end=170
 
 ```json
 {
-  "data": [
+  "user_agents": [
     { "user_agent": "Chrome/120", "downloads": 500, "unique_ips": 234 },
     { "user_agent": "Safari/17", "downloads": 300, "unique_ips": 156 }
-  ]
+  ],
+  "period": { "start": 1704067200000, "end": 1706745600000 }
 }
 ```
 
@@ -637,7 +664,7 @@ curl -X POST "https://r2index.acme.com/maintenance/cleanup-downloads" \
 
 ```json
 {
-  "deleted": 1234,
+  "deleted_count": 1234,
   "retention_days": 365
 }
 ```
@@ -726,10 +753,10 @@ export default {
 # Run locally
 npm run dev
 
-# Run tests
+# Run unit tests
 npm test
 
-# Run tests in watch mode
+# Run unit tests in watch mode
 npm run test:watch
 
 # Type check
@@ -737,6 +764,29 @@ npx tsc --noEmit
 
 # Deploy
 npm run deploy
+
+# Run e2e tests (API only)
+python e2e_test.py <api_url> <api_token>
+
+# Run e2e tests with R2 upload/download (includes 5GB large file test)
+python e2e_test.py <api_url> <api_token> <r2_access_key_id> <r2_secret_access_key> <r2_account_id>
+```
+
+### E2E Tests with Bao
+
+```bash
+# API-only e2e tests
+python e2e_test.py \
+  $(bao kv get -field=api-url -namespace=elaunira/production kv/r2index) \
+  $(bao kv get -field=api-token -namespace=elaunira/production kv/r2index)
+
+# Full e2e tests including R2 upload/download and 5GB large file test
+python e2e_test.py \
+  $(bao kv get -field=api-url -namespace=elaunira/production kv/r2index) \
+  $(bao kv get -field=api-token -namespace=elaunira/production kv/r2index) \
+  $(bao kv get -field=access-key-id -namespace=elaunira/production kv/r2index/r2/e2e-tests) \
+  $(bao kv get -field=secret-access-key -namespace=elaunira/production kv/r2index/r2/e2e-tests) \
+  $(bao kv get -field=account-id -namespace=elaunira/production kv/r2index/r2/e2e-tests)
 ```
 
 ## License
