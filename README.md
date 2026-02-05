@@ -18,9 +18,9 @@ The Worker handles metadata only. File content is uploaded/downloaded directly t
 
 <table>
 <tr>
-<td align="center"><a href="https://github.com/ipregistry" target="_blank" rel="noopener noreferrer"><img src="https://avatars.githubusercontent.com/u/48379573?v=4" width="64" /></a></td>
-<td align="center"><a href="https://github.com/noticeable-app" target="_blank" rel="noopener noreferrer"><img src="https://avatars.githubusercontent.com/u/32177975?v=4" width="64" /></a></td>
-<td align="center"><a href="https://github.com/openplanetdata" target="_blank" rel="noopener noreferrer"><img src="https://avatars.githubusercontent.com/u/214255256?v=4" width="64" /></a></td>
+<td align="center"><a href="https://ipregistry.co" target="_blank" rel="noopener noreferrer"><img src="https://avatars.githubusercontent.com/u/48379573?v=4" width="64" /></a></td>
+<td align="center"><a href="https://noticeable.io" target="_blank" rel="noopener noreferrer"><img src="https://avatars.githubusercontent.com/u/32177975?v=4" width="64" /></a></td>
+<td align="center"><a href="https://openplanetdata.com" target="_blank" rel="noopener noreferrer"><img src="https://avatars.githubusercontent.com/u/214255256?v=4" width="64" /></a></td>
 </tr>
 <tr>
 <td align="center">Ipregistry</td>
