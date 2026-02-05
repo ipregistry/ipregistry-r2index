@@ -13,17 +13,15 @@ pip install elaunira-r2index
 ### Sync Client
 
 ```python
-from elaunira.r2index import R2IndexClient, R2Config
+from elaunira.r2index import R2IndexClient
 
 client = R2IndexClient(
-    api_url="https://r2index.example.com",
-    api_token="your-bearer-token",
-    r2_config=R2Config(
-        access_key_id="your-r2-access-key-id",
-        secret_access_key="your-r2-secret-access-key",
-        endpoint_url="https://your-account-id.r2.cloudflarestorage.com",
-        bucket="your-bucket-name",
-    ),
+    index_api_url="https://r2index.example.com",
+    index_api_token="your-bearer-token",
+    r2_access_key_id="your-r2-access-key-id",
+    r2_secret_access_key="your-r2-secret-access-key",
+    r2_endpoint_url="https://your-account-id.r2.cloudflarestorage.com",
+    r2_bucket="your-bucket-name",
 )
 
 # Upload and register a file
@@ -50,17 +48,15 @@ path, record = client.download_and_record(
 ### Async Client
 
 ```python
-from elaunira.r2index import AsyncR2IndexClient, R2Config
+from elaunira.r2index import AsyncR2IndexClient
 
 async with AsyncR2IndexClient(
-    api_url="https://r2index.example.com",
-    api_token="your-bearer-token",
-    r2_config=R2Config(
-        access_key_id="your-r2-access-key-id",
-        secret_access_key="your-r2-secret-access-key",
-        endpoint_url="https://your-account-id.r2.cloudflarestorage.com",
-        bucket="your-bucket-name",
-    ),
+    index_api_url="https://r2index.example.com",
+    index_api_token="your-bearer-token",
+    r2_access_key_id="your-r2-access-key-id",
+    r2_secret_access_key="your-r2-secret-access-key",
+    r2_endpoint_url="https://your-account-id.r2.cloudflarestorage.com",
+    r2_bucket="your-bucket-name",
 ) as client:
     # Upload
     record = await client.upload_and_register(
@@ -87,12 +83,15 @@ async with AsyncR2IndexClient(
 Control multipart transfer settings with `R2TransferConfig`:
 
 ```python
-from elaunira.r2index import R2IndexClient, R2Config, R2TransferConfig
+from elaunira.r2index import R2IndexClient, R2TransferConfig
 
 client = R2IndexClient(
-    api_url="https://r2index.example.com",
-    api_token="your-bearer-token",
-    r2_config=R2Config(...),
+    index_api_url="https://r2index.example.com",
+    index_api_token="your-bearer-token",
+    r2_access_key_id="your-r2-access-key-id",
+    r2_secret_access_key="your-r2-secret-access-key",
+    r2_endpoint_url="https://your-account-id.r2.cloudflarestorage.com",
+    r2_bucket="your-bucket-name",
 )
 
 # Custom transfer settings
@@ -104,7 +103,6 @@ transfer_config = R2TransferConfig(
 )
 
 path, record = client.download_and_record(
-    bucket="my-bucket",
     object_id="/data/files/v2/largefile.zip",
     destination="./downloads/largefile.zip",
     transfer_config=transfer_config,
@@ -120,7 +118,6 @@ def on_progress(bytes_transferred: int) -> None:
     print(f"Downloaded: {bytes_transferred / 1024 / 1024:.1f} MB")
 
 path, record = client.download_and_record(
-    bucket="my-bucket",
     object_id="/releases/myapp/v1/myapp.zip",
     destination="./downloads/myfile.zip",
     progress_callback=on_progress,

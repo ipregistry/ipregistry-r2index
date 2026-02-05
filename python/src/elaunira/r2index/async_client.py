@@ -81,29 +81,45 @@ class AsyncR2IndexClient:
 
     def __init__(
         self,
-        api_url: str,
-        api_token: str,
-        r2_config: R2Config | None = None,
+        index_api_url: str,
+        index_api_token: str,
+        r2_access_key_id: str | None = None,
+        r2_secret_access_key: str | None = None,
+        r2_endpoint_url: str | None = None,
+        r2_bucket: str | None = None,
         timeout: float = 30.0,
     ) -> None:
         """
         Initialize the async R2Index client.
 
         Args:
-            api_url: Base URL of the r2index API.
-            api_token: Bearer token for authentication.
-            r2_config: Optional R2 configuration for upload operations.
+            index_api_url: Base URL of the r2index API.
+            index_api_token: Bearer token for authentication.
+            r2_access_key_id: R2 access key ID for storage operations.
+            r2_secret_access_key: R2 secret access key for storage operations.
+            r2_endpoint_url: R2 endpoint URL for storage operations.
+            r2_bucket: R2 bucket name for storage operations.
             timeout: Request timeout in seconds.
         """
-        self.api_url = api_url.rstrip("/")
-        self._token = api_token
+        self.api_url = index_api_url.rstrip("/")
+        self._token = index_api_token
         self._timeout = timeout
-        self._r2_config = r2_config
         self._storage: AsyncR2Storage | None = None
+
+        # Build R2 config if credentials provided
+        if r2_access_key_id and r2_secret_access_key and r2_endpoint_url and r2_bucket:
+            self._r2_config: R2Config | None = R2Config(
+                access_key_id=r2_access_key_id,
+                secret_access_key=r2_secret_access_key,
+                endpoint_url=r2_endpoint_url,
+                bucket=r2_bucket,
+            )
+        else:
+            self._r2_config = None
 
         self._client = httpx.AsyncClient(
             base_url=self.api_url,
-            headers={"Authorization": f"Bearer {api_token}"},
+            headers={"Authorization": f"Bearer {index_api_token}"},
             timeout=timeout,
         )
 

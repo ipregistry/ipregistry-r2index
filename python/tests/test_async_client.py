@@ -10,8 +10,8 @@ from elaunira.r2index import AsyncR2IndexClient, FileCreateRequest
 def async_client():
     """Create a test async client."""
     return AsyncR2IndexClient(
-        api_url="https://api.example.com",
-        api_token="test-token",
+        index_api_url="https://api.example.com",
+        index_api_token="test-token",
     )
 
 
@@ -19,8 +19,8 @@ def async_client():
 async def test_async_client_context_manager():
     """Test async client as context manager."""
     async with AsyncR2IndexClient(
-        api_url="https://api.example.com",
-        api_token="test-token",
+        index_api_url="https://api.example.com",
+        index_api_token="test-token",
     ) as client:
         assert client is not None
 

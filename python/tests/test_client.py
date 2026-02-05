@@ -16,8 +16,8 @@ from elaunira.r2index import (
 def client():
     """Create a test client."""
     return R2IndexClient(
-        api_url="https://api.example.com",
-        api_token="test-token",
+        index_api_url="https://api.example.com",
+        index_api_token="test-token",
     )
 
 
@@ -29,8 +29,8 @@ def test_client_initialization(client: R2IndexClient):
 def test_client_context_manager():
     """Test client as context manager."""
     with R2IndexClient(
-        api_url="https://api.example.com",
-        api_token="test-token",
+        index_api_url="https://api.example.com",
+        index_api_token="test-token",
     ) as client:
         assert client is not None
 

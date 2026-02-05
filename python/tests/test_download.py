@@ -11,7 +11,7 @@ from elaunira.r2index import (
     RemoteTuple,
 )
 from elaunira.r2index.client import _parse_object_id
-from elaunira.r2index.storage import R2Config, R2TransferConfig
+from elaunira.r2index.storage import R2TransferConfig
 
 
 class TestParseObjectId:
@@ -81,8 +81,8 @@ class TestGetFileByTuple:
     def client(self):
         """Create a test client."""
         return R2IndexClient(
-            api_url="https://api.example.com",
-            api_token="test-token",
+            index_api_url="https://api.example.com",
+            index_api_token="test-token",
         )
 
     def test_get_file_by_tuple(self, client: R2IndexClient, httpx_mock: HTTPXMock):
@@ -129,16 +129,13 @@ class TestDownloadAndRecord:
     @pytest.fixture
     def client_with_r2(self):
         """Create a test client with R2 config."""
-        r2_config = R2Config(
-            access_key_id="test-key",
-            secret_access_key="test-secret",
-            endpoint_url="https://r2.example.com",
-            bucket="test-bucket",
-        )
         return R2IndexClient(
-            api_url="https://api.example.com",
-            api_token="test-token",
-            r2_config=r2_config,
+            index_api_url="https://api.example.com",
+            index_api_token="test-token",
+            r2_access_key_id="test-key",
+            r2_secret_access_key="test-secret",
+            r2_endpoint_url="https://r2.example.com",
+            r2_bucket="test-bucket",
         )
 
     def test_download_and_record_with_defaults(
