@@ -625,7 +625,7 @@ class R2IndexClient:
             destination: Local path where the file will be saved.
             ip_address: IP address of the downloader. If not provided, fetched
                 from checkip.amazonaws.com.
-            user_agent: User agent string. Defaults to "elaunira-r2index/0.1.0".
+            user_agent: User agent string. Defaults to "elaunira-r2index/<version>".
             progress_callback: Optional callback for download progress.
             transfer_config: Optional transfer configuration for multipart/threading.
 

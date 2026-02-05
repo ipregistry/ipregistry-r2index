@@ -39,7 +39,7 @@ npm run db:init
 ### 4. Set API token
 
 ```bash
-wrangler secret put API_TOKEN
+wrangler secret put R2INDEX_API_TOKEN
 ```
 
 ### 5. Deploy
@@ -62,7 +62,7 @@ routes = [
 ]
 
 [[d1_databases]]
-binding = "DB"
+binding = "D1"
 database_name = "r2index"
 database_id = "<your-database-id>"
 
@@ -75,7 +75,7 @@ CACHE_MAX_AGE = "60"
 
 | Variable | Description | Default |
 |----------|-------------|---------|
-| `API_TOKEN` | Bearer token for API authentication (set via `wrangler secret put`) | Required |
+| `R2INDEX_API_TOKEN` | Bearer token for API authentication (set via `wrangler secret put`) | Required |
 | `CACHE_MAX_AGE` | Cache-Control max-age in seconds | `60` |
 | `DOWNLOADS_RETENTION_DAYS` | Days to keep download records before cleanup | `365` |
 
