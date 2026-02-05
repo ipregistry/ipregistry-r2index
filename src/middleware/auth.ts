@@ -15,7 +15,7 @@ export async function authMiddleware(c: Context<{ Bindings: Env }>, next: Next) 
     return c.json(Errors.INVALID_AUTH_FORMAT, 401);
   }
 
-  if (token !== c.env.API_TOKEN) {
+  if (token !== c.env.R2INDEX_API_TOKEN) {
     return c.json(Errors.INVALID_TOKEN, 403);
   }
 

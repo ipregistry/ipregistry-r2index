@@ -7,7 +7,7 @@ export default defineWorkersConfig({
         wrangler: { configPath: './wrangler.toml' },
         miniflare: {
           bindings: {
-            API_TOKEN: 'test-token',
+            R2INDEX_API_TOKEN: 'test-token',
             CACHE_MAX_AGE: '60',
           },
         },
