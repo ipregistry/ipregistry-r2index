@@ -608,12 +608,15 @@ class E2ETest:
                     pass
 
     def test_large_file_upload(self) -> None:
-        self.section("Large File Upload (5GB)")
+        # File size configurable via E2E_LARGE_FILE_SIZE_GB env var (default: 5GB)
+        size_gb = int(os.environ.get("E2E_LARGE_FILE_SIZE_GB", "5"))
+        file_size = size_gb * 1024 * 1024 * 1024
+
+        self.section(f"Large File Upload ({size_gb}GB)")
 
         bucket = "r2index-e2e-tests"
         version = datetime.now(timezone.utc).strftime("%Y%m%d-%H%M%S")
         uploaded_record = None
-        file_size = 5 * 1024 * 1024 * 1024  # 5GB
         chunk_size = 64 * 1024 * 1024  # 64MB chunks for generation
 
         # Create a temporary directory for the large file

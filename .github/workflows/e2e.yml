@@ -12,6 +12,11 @@ on:
         required: false
         default: true
         type: boolean
+      large_file_size_gb:
+        description: 'Large file test size in GB'
+        required: false
+        default: '1'
+        type: string
 
 jobs:
   e2e:
@@ -47,6 +52,7 @@ jobs:
       - name: Run E2E tests
         if: steps.check-secrets.outputs.skip != 'true'
         env:
+          E2E_LARGE_FILE_SIZE_GB: ${{ inputs.large_file_size_gb || '1' }}
           R2INDEX_API_TOKEN: ${{ secrets.R2INDEX_API_TOKEN }}
           R2INDEX_API_URL: ${{ secrets.R2INDEX_API_URL }}
           R2_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
