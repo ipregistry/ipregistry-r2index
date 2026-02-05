@@ -162,7 +162,7 @@ class R2IndexClient:
 
     # File Operations
 
-    def list_files(
+    def list(
         self,
         bucket: str | None = None,
         category: str | None = None,
@@ -203,7 +203,7 @@ class R2IndexClient:
         data = self._handle_response(response)
         return FileListResponse.model_validate(data)
 
-    def create_file(self, data: FileCreateRequest) -> FileRecord:
+    def create(self, data: FileCreateRequest) -> FileRecord:
         """
         Create or upsert a file record.
 
@@ -217,7 +217,7 @@ class R2IndexClient:
         result = self._handle_response(response)
         return FileRecord.model_validate(result)
 
-    def get_file(self, file_id: str) -> FileRecord:
+    def get(self, file_id: str) -> FileRecord:
         """
         Get a file by ID.
 
@@ -234,7 +234,7 @@ class R2IndexClient:
         data = self._handle_response(response)
         return FileRecord.model_validate(data)
 
-    def update_file(self, file_id: str, data: FileUpdateRequest) -> FileRecord:
+    def update(self, file_id: str, data: FileUpdateRequest) -> FileRecord:
         """
         Update a file record.
 
@@ -252,7 +252,7 @@ class R2IndexClient:
         result = self._handle_response(response)
         return FileRecord.model_validate(result)
 
-    def delete_file(self, file_id: str) -> None:
+    def delete(self, file_id: str) -> None:
         """
         Delete a file by ID.
 
@@ -265,7 +265,7 @@ class R2IndexClient:
         response = self._client.delete(f"/files/{file_id}")
         self._handle_response(response)
 
-    def delete_file_by_tuple(self, remote_tuple: RemoteTuple) -> None:
+    def delete_by_tuple(self, remote_tuple: RemoteTuple) -> None:
         """
         Delete a file by remote tuple.
 
@@ -284,7 +284,7 @@ class R2IndexClient:
         response = self._client.delete("/files", params=params)
         self._handle_response(response)
 
-    def get_file_by_tuple(self, remote_tuple: RemoteTuple) -> FileRecord:
+    def get_by_tuple(self, remote_tuple: RemoteTuple) -> FileRecord:
         """
         Get a file by remote tuple.
 
@@ -307,7 +307,7 @@ class R2IndexClient:
         data = self._handle_response(response)
         return FileRecord.model_validate(data)
 
-    def get_index(
+    def index(
         self,
         bucket: str | None = None,
         category: str | None = None,
@@ -509,7 +509,7 @@ class R2IndexClient:
 
     # High-Level Pipeline
 
-    def upload_and_register(
+    def upload(
         self,
         bucket: str,
         local_path: str | Path,
@@ -589,14 +589,14 @@ class R2IndexClient:
             sha512=checksums.sha512,
         )
 
-        return self.create_file(create_request)
+        return self.create(create_request)
 
     def _get_public_ip(self) -> str:
         """Fetch public IP address from checkip.amazonaws.com."""
         response = httpx.get(CHECKIP_URL, timeout=10.0)
         return response.text.strip()
 
-    def download_and_record(
+    def download(
         self,
         bucket: str,
         object_id: str,
@@ -650,7 +650,7 @@ class R2IndexClient:
         remote_tuple = _parse_object_id(object_id, bucket)
 
         # Step 2: Get file record by tuple
-        file_record = self.get_file_by_tuple(remote_tuple)
+        file_record = self.get_by_tuple(remote_tuple)
 
         # Step 3: Build R2 object key and download
         object_key = object_id.strip("/")

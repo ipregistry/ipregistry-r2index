@@ -24,7 +24,7 @@ client = R2IndexClient(
 )
 
 # Upload and register a file
-record = client.upload_and_register(
+record = client.upload(
     bucket="my-bucket",
     local_path="./myfile.zip",
     category="software",
@@ -37,7 +37,7 @@ record = client.upload_and_register(
 
 # Download a file and record the download
 # IP address is auto-detected, user agent defaults to "elaunira-r2index/<version>"
-path, record = client.download_and_record(
+path, record = client.download(
     bucket="my-bucket",
     object_id="/releases/myapp/v1/myapp.zip",
     destination="./downloads/myfile.zip",
@@ -57,7 +57,7 @@ async with AsyncR2IndexClient(
     r2_endpoint_url="https://your-account-id.r2.cloudflarestorage.com",
 ) as client:
     # Upload
-    record = await client.upload_and_register(
+    record = await client.upload(
         bucket="my-bucket",
         local_path="./myfile.zip",
         category="software",
@@ -69,7 +69,7 @@ async with AsyncR2IndexClient(
     )
 
     # Download
-    path, record = await client.download_and_record(
+    path, record = await client.download(
         bucket="my-bucket",
         object_id="/releases/myapp/v1/myapp.zip",
         destination="./downloads/myfile.zip",
@@ -99,7 +99,7 @@ transfer_config = R2TransferConfig(
     use_threads=True,                        # Enable threading (default)
 )
 
-path, record = client.download_and_record(
+path, record = client.download(
     bucket="my-bucket",
     object_id="/data/files/v2/largefile.zip",
     destination="./downloads/largefile.zip",
@@ -115,7 +115,7 @@ Default `max_concurrency` is 2x the number of CPU cores (minimum 4).
 def on_progress(bytes_transferred: int) -> None:
     print(f"Downloaded: {bytes_transferred / 1024 / 1024:.1f} MB")
 
-path, record = client.download_and_record(
+path, record = client.download(
     bucket="my-bucket",
     object_id="/releases/myapp/v1/myapp.zip",
     destination="./downloads/myfile.zip",

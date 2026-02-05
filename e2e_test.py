@@ -98,7 +98,7 @@ class E2ETest:
         # Test without auth
         try:
             bad_client = R2IndexClient(index_api_url=self.api_url, index_api_token="")
-            bad_client.list_files()
+            bad_client.list()
             bad_client.close()
             self.fail_test("Should reject empty token")
         except AuthenticationError:
@@ -109,7 +109,7 @@ class E2ETest:
         # Test with wrong token
         try:
             bad_client = R2IndexClient(index_api_url=self.api_url, index_api_token="wrong-token")
-            bad_client.list_files()
+            bad_client.list()
             bad_client.close()
             self.fail_test("Should reject invalid token")
         except AuthenticationError:
@@ -119,7 +119,7 @@ class E2ETest:
 
         # Test with valid token
         try:
-            self.client.list_files()
+            self.client.list()
             self.pass_test("Accepts valid token (200)")
         except Exception as e:
             self.fail_test("Valid token test", str(e))
@@ -147,7 +147,7 @@ class E2ETest:
                 sha512="cf83e1357eefb8bdf1542850d66d8007d620e4050b5715dc83f4a921d36ce9ce47d0d13c5d85f2b0ff8318d2877eec2f63b931bd47417a81a538327af927da3e",
                 tags=["e2e", "test"],
             )
-            file_record = self.client.create_file(create_request)
+            file_record = self.client.create(create_request)
             file_id = file_record.id
             self.pass_test(f"POST /files - Create file (id: {file_id})")
         except Exception as e:
@@ -156,7 +156,7 @@ class E2ETest:
 
         # Get file by ID
         try:
-            file_record = self.client.get_file(file_id)
+            file_record = self.client.get(file_id)
             if file_record.id == file_id:
                 self.pass_test("GET /files/:id - Get file by ID")
             else:
@@ -170,7 +170,7 @@ class E2ETest:
                 name="Updated E2E Test File",
                 size=2048,
             )
-            updated = self.client.update_file(file_id, update_request)
+            updated = self.client.update(file_id, update_request)
             if updated.name == "Updated E2E Test File" and updated.size == 2048:
                 self.pass_test("PUT /files/:id - Update file")
             else:
@@ -180,21 +180,21 @@ class E2ETest:
 
         # List files with filters
         try:
-            response = self.client.list_files(category="e2e-test")
+            response = self.client.list(category="e2e-test")
             self.pass_test("GET /files?category= - List with filter")
         except Exception as e:
             self.fail_test("GET /files?category=", str(e))
 
         # List files with bucket filter
         try:
-            response = self.client.list_files(bucket="e2e-test-bucket")
+            response = self.client.list(bucket="e2e-test-bucket")
             self.pass_test("GET /files?bucket= - List with bucket filter")
         except Exception as e:
             self.fail_test("GET /files?bucket=", str(e))
 
         # List files with tags filter
         try:
-            response = self.client.list_files(tags=["e2e", "test"])
+            response = self.client.list(tags=["e2e", "test"])
             self.pass_test("GET /files?tags= - List with tags filter")
         except Exception as e:
             self.fail_test("GET /files?tags=", str(e))
@@ -207,7 +207,7 @@ class E2ETest:
                 remote_filename="test-file.txt",
                 remote_version="v1",
             )
-            file_record = self.client.get_file_by_tuple(remote_tuple)
+            file_record = self.client.get_by_tuple(remote_tuple)
             if file_record.id == file_id:
                 self.pass_test("GET /files/by-tuple - Get by remote tuple")
             else:
@@ -217,7 +217,7 @@ class E2ETest:
 
         # Get nested index
         try:
-            index = self.client.get_index(category="e2e-test")
+            index = self.client.index(category="e2e-test")
             self.pass_test("GET /files/index - Nested index")
         except Exception as e:
             self.fail_test("GET /files/index", str(e))
@@ -287,7 +287,7 @@ class E2ETest:
         # Delete by ID
         if file_id:
             try:
-                self.client.delete_file(file_id)
+                self.client.delete(file_id)
                 self.pass_test("DELETE /files/:id - Delete by ID")
             except Exception as e:
                 self.fail_test("DELETE /files/:id", str(e))
@@ -309,7 +309,7 @@ class E2ETest:
                 sha256="e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
                 sha512="cf83e1357eefb8bdf1542850d66d8007d620e4050b5715dc83f4a921d36ce9ce47d0d13c5d85f2b0ff8318d2877eec2f63b931bd47417a81a538327af927da3e",
             )
-            self.client.create_file(create_request)
+            self.client.create(create_request)
 
             remote_tuple = RemoteTuple(
                 bucket="e2e-test-bucket",
@@ -317,7 +317,7 @@ class E2ETest:
                 remote_filename="test-file-2.txt",
                 remote_version="v1",
             )
-            self.client.delete_file_by_tuple(remote_tuple)
+            self.client.delete_by_tuple(remote_tuple)
             self.pass_test("DELETE /files - Delete by remote tuple")
         except Exception as e:
             self.fail_test("DELETE /files (tuple)", str(e))
@@ -327,7 +327,7 @@ class E2ETest:
 
         # 404 for non-existent file
         try:
-            self.client.get_file("non-existent-id-12345")
+            self.client.get("non-existent-id-12345")
             self.fail_test("Should raise NotFoundError")
         except NotFoundError:
             self.pass_test("GET /files/:id - Returns 404 for non-existent")
@@ -351,7 +351,7 @@ class E2ETest:
                 sha256="e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
                 sha512="cf83e1357eefb8bdf1542850d66d8007d620e4050b5715dc83f4a921d36ce9ce47d0d13c5d85f2b0ff8318d2877eec2f63b931bd47417a81a538327af927da3e",
             )
-            self.client.create_file(invalid_request)
+            self.client.create(invalid_request)
             self.fail_test("Should raise ValidationError")
         except ValidationError:
             self.pass_test("POST /files - Returns 400 for invalid input")

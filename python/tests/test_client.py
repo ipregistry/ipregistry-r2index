@@ -65,7 +65,7 @@ def test_list_files(client: R2IndexClient, httpx_mock: HTTPXMock):
         },
     )
 
-    response = client.list_files()
+    response = client.list()
     assert len(response.files) == 1
     assert response.files[0].id == "file1"
 
@@ -77,7 +77,7 @@ def test_list_files_with_filters(client: R2IndexClient, httpx_mock: HTTPXMock):
         json={"files": [], "total": 0, "page": 1, "pageSize": 20},
     )
 
-    response = client.list_files(
+    response = client.list(
         category="software",
         entity="myapp",
         tags=["release", "stable"],
@@ -123,7 +123,7 @@ def test_create_file(client: R2IndexClient, httpx_mock: HTTPXMock):
         sha256="ghi",
         sha512="jkl",
     )
-    record = client.create_file(request)
+    record = client.create(request)
     assert record.id == "new-file"
 
 
@@ -150,7 +150,7 @@ def test_get_file(client: R2IndexClient, httpx_mock: HTTPXMock):
         },
     )
 
-    record = client.get_file("file123")
+    record = client.get("file123")
     assert record.id == "file123"
 
 
@@ -163,7 +163,7 @@ def test_get_file_not_found(client: R2IndexClient, httpx_mock: HTTPXMock):
     )
 
     with pytest.raises(NotFoundError) as exc_info:
-        client.get_file("notfound")
+        client.get("notfound")
 
     assert exc_info.value.status_code == 404
 
@@ -177,7 +177,7 @@ def test_authentication_error(client: R2IndexClient, httpx_mock: HTTPXMock):
     )
 
     with pytest.raises(AuthenticationError) as exc_info:
-        client.list_files()
+        client.list()
 
     assert exc_info.value.status_code == 401
 
@@ -206,7 +206,7 @@ def test_validation_error(client: R2IndexClient, httpx_mock: HTTPXMock):
     )
 
     with pytest.raises(ValidationError) as exc_info:
-        client.create_file(request)
+        client.create(request)
 
     assert exc_info.value.status_code == 400
 

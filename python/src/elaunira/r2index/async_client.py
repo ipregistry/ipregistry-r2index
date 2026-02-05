@@ -163,7 +163,7 @@ class AsyncR2IndexClient:
 
     # File Operations
 
-    async def list_files(
+    async def list(
         self,
         bucket: str | None = None,
         category: str | None = None,
@@ -204,7 +204,7 @@ class AsyncR2IndexClient:
         data = self._handle_response(response)
         return FileListResponse.model_validate(data)
 
-    async def create_file(self, data: FileCreateRequest) -> FileRecord:
+    async def create(self, data: FileCreateRequest) -> FileRecord:
         """
         Create or upsert a file record.
 
@@ -218,7 +218,7 @@ class AsyncR2IndexClient:
         result = self._handle_response(response)
         return FileRecord.model_validate(result)
 
-    async def get_file(self, file_id: str) -> FileRecord:
+    async def get(self, file_id: str) -> FileRecord:
         """
         Get a file by ID.
 
@@ -235,7 +235,7 @@ class AsyncR2IndexClient:
         data = self._handle_response(response)
         return FileRecord.model_validate(data)
 
-    async def update_file(self, file_id: str, data: FileUpdateRequest) -> FileRecord:
+    async def update(self, file_id: str, data: FileUpdateRequest) -> FileRecord:
         """
         Update a file record.
 
@@ -253,7 +253,7 @@ class AsyncR2IndexClient:
         result = self._handle_response(response)
         return FileRecord.model_validate(result)
 
-    async def delete_file(self, file_id: str) -> None:
+    async def delete(self, file_id: str) -> None:
         """
         Delete a file by ID.
 
@@ -266,7 +266,7 @@ class AsyncR2IndexClient:
         response = await self._client.delete(f"/files/{file_id}")
         self._handle_response(response)
 
-    async def delete_file_by_tuple(self, remote_tuple: RemoteTuple) -> None:
+    async def delete_by_tuple(self, remote_tuple: RemoteTuple) -> None:
         """
         Delete a file by remote tuple.
 
@@ -285,7 +285,7 @@ class AsyncR2IndexClient:
         response = await self._client.delete("/files", params=params)
         self._handle_response(response)
 
-    async def get_file_by_tuple(self, remote_tuple: RemoteTuple) -> FileRecord:
+    async def get_by_tuple(self, remote_tuple: RemoteTuple) -> FileRecord:
         """
         Get a file by remote tuple.
 
@@ -308,7 +308,7 @@ class AsyncR2IndexClient:
         data = self._handle_response(response)
         return FileRecord.model_validate(data)
 
-    async def get_index(
+    async def index(
         self,
         bucket: str | None = None,
         category: str | None = None,
@@ -510,7 +510,7 @@ class AsyncR2IndexClient:
 
     # High-Level Pipeline
 
-    async def upload_and_register(
+    async def upload(
         self,
         bucket: str,
         local_path: str | Path,
@@ -590,7 +590,7 @@ class AsyncR2IndexClient:
             sha512=checksums.sha512,
         )
 
-        return await self.create_file(create_request)
+        return await self.create(create_request)
 
     async def _get_public_ip(self) -> str:
         """Fetch public IP address from checkip.amazonaws.com."""
@@ -598,7 +598,7 @@ class AsyncR2IndexClient:
             response = await client.get(CHECKIP_URL, timeout=10.0)
             return response.text.strip()
 
-    async def download_and_record(
+    async def download(
         self,
         bucket: str,
         object_id: str,
@@ -652,7 +652,7 @@ class AsyncR2IndexClient:
         remote_tuple = _parse_object_id(object_id, bucket)
 
         # Step 2: Get file record by tuple
-        file_record = await self.get_file_by_tuple(remote_tuple)
+        file_record = await self.get_by_tuple(remote_tuple)
 
         # Step 3: Build R2 object key and download
         object_key = object_id.strip("/")

@@ -56,7 +56,7 @@ async def test_async_list_files(async_client: AsyncR2IndexClient, httpx_mock: HT
         },
     )
 
-    response = await async_client.list_files()
+    response = await async_client.list()
     assert len(response.files) == 1
     await async_client.close()
 
@@ -100,7 +100,7 @@ async def test_async_create_file(async_client: AsyncR2IndexClient, httpx_mock: H
         sha256="ghi",
         sha512="jkl",
     )
-    record = await async_client.create_file(request)
+    record = await async_client.create(request)
     assert record.id == "new-file"
     await async_client.close()
 

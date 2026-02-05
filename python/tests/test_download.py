@@ -114,7 +114,7 @@ class TestGetFileByTuple:
             remote_filename="myapp.zip",
             remote_version="v1",
         )
-        record = client.get_file_by_tuple(remote_tuple)
+        record = client.get_by_tuple(remote_tuple)
 
         assert record.id == "file123"
         assert record.bucket == "test-bucket"
@@ -191,7 +191,7 @@ class TestDownloadAndRecord:
             "download_file",
             return_value=destination,
         ) as mock_download:
-            downloaded_path, file_record = client_with_r2.download_and_record(
+            downloaded_path, file_record = client_with_r2.download(
                 bucket="test-bucket",
                 object_id="/releases/myapp/v1/myapp.zip",
                 destination=str(destination),
@@ -249,7 +249,7 @@ class TestDownloadAndRecord:
             "download_file",
             return_value=destination,
         ):
-            downloaded_path, file_record = client_with_r2.download_and_record(
+            downloaded_path, file_record = client_with_r2.download(
                 bucket="test-bucket",
                 object_id="/releases/myapp/v1/myapp.zip",
                 destination=str(destination),
@@ -267,7 +267,7 @@ class TestDownloadAndRecord:
         destination = tmp_path / "file.zip"
 
         with pytest.raises(ValueError) as exc_info:
-            client_with_r2.download_and_record(
+            client_with_r2.download(
                 bucket="test-bucket",
                 object_id="/invalid/path",
                 destination=str(destination),
