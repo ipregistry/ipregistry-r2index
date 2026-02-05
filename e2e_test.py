@@ -2,15 +2,20 @@
 """End-to-end test for r2index API using the Python client library.
 
 Usage:
-    python e2e_test.py <api_url> <api_token>
+    python e2e_test.py <api_url> <api_token> [<r2_access_key_id> <r2_secret_access_key> <r2_account_id>]
 
 Example:
     python e2e_test.py https://r2index.example.com my-secret-token
+    python e2e_test.py https://r2index.example.com my-secret-token access-key secret-key account-id
 """
 
+import os
 import sys
-import time
+import tempfile
 from datetime import datetime, timedelta, timezone
+from pathlib import Path
+
+import httpx
 
 from elaunira.r2index import (
     R2IndexClient,
@@ -20,6 +25,7 @@ from elaunira.r2index import (
     NotFoundError,
     ValidationError,
     AuthenticationError,
+    DownloadRecordRequest,
 )
 
 
@@ -31,12 +37,30 @@ class Colors:
 
 
 class E2ETest:
-    def __init__(self, api_url: str, api_token: str):
+    def __init__(
+        self,
+        api_url: str,
+        api_token: str,
+        r2_access_key_id: str | None = None,
+        r2_secret_access_key: str | None = None,
+        r2_account_id: str | None = None,
+    ):
         self.api_url = api_url
         self.api_token = api_token
+        self.r2_enabled = all([r2_access_key_id, r2_secret_access_key, r2_account_id])
         self.passed = 0
         self.failed = 0
-        self.client = R2IndexClient(index_api_url=api_url, index_api_token=api_token)
+
+        if self.r2_enabled:
+            self.client = R2IndexClient(
+                index_api_url=api_url,
+                index_api_token=api_token,
+                r2_access_key_id=r2_access_key_id,
+                r2_secret_access_key=r2_secret_access_key,
+                r2_endpoint_url=f"https://{r2_account_id}.r2.cloudflarestorage.com",
+            )
+        else:
+            self.client = R2IndexClient(index_api_url=api_url, index_api_token=api_token)
 
     def pass_test(self, name: str) -> None:
         print(f"{Colors.GREEN}✓ {name}{Colors.RESET}")
@@ -56,6 +80,7 @@ class E2ETest:
         print("R2Index API End-to-End Test (Python Client)")
         print("=" * 50)
         print(f"API URL: {self.api_url}")
+        print(f"R2 Storage: {'enabled' if self.r2_enabled else 'disabled'}")
         print("=" * 50)
 
         try:
@@ -67,6 +92,9 @@ class E2ETest:
             self.test_file_deletion(file_id)
             self.test_error_handling()
             self.test_maintenance()
+            if self.r2_enabled:
+                self.test_upload_download()
+                self.test_large_file_upload()
         finally:
             self.client.close()
 
@@ -95,16 +123,15 @@ class E2ETest:
     def test_authentication(self) -> None:
         self.section("Authentication")
 
-        # Test without auth
+        # Test without auth (empty token causes invalid header or auth error)
         try:
             bad_client = R2IndexClient(index_api_url=self.api_url, index_api_token="")
             bad_client.list()
             bad_client.close()
             self.fail_test("Should reject empty token")
-        except AuthenticationError:
-            self.pass_test("Rejects empty token (401/403)")
-        except Exception as e:
-            self.fail_test("Auth test", str(e))
+        except (AuthenticationError, httpx.LocalProtocolError):
+            # LocalProtocolError for invalid header, AuthenticationError for 401/403
+            self.pass_test("Rejects empty token")
 
         # Test with wrong token
         try:
@@ -141,10 +168,10 @@ class E2ETest:
                 remote_version="v1",
                 name="E2E Test File",
                 size=1024,
-                md5="d41d8cd98f00b204e9800998ecf8427e",
-                sha1="da39a3ee5e6b4b0d3255bfef95601890afd80709",
-                sha256="e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
-                sha512="cf83e1357eefb8bdf1542850d66d8007d620e4050b5715dc83f4a921d36ce9ce47d0d13c5d85f2b0ff8318d2877eec2f63b931bd47417a81a538327af927da3e",
+                checksum_md5="d41d8cd98f00b204e9800998ecf8427e",
+                checksum_sha1="da39a3ee5e6b4b0d3255bfef95601890afd80709",
+                checksum_sha256="e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+                checksum_sha512="cf83e1357eefb8bdf1542850d66d8007d620e4050b5715dc83f4a921d36ce9ce47d0d13c5d85f2b0ff8318d2877eec2f63b931bd47417a81a538327af927da3e",
                 tags=["e2e", "test"],
             )
             file_record = self.client.create(create_request)
@@ -180,21 +207,21 @@ class E2ETest:
 
         # List files with filters
         try:
-            response = self.client.list(category="e2e-test")
+            self.client.list(category="e2e-test")
             self.pass_test("GET /files?category= - List with filter")
         except Exception as e:
             self.fail_test("GET /files?category=", str(e))
 
         # List files with bucket filter
         try:
-            response = self.client.list(bucket="e2e-test-bucket")
+            self.client.list(bucket="e2e-test-bucket")
             self.pass_test("GET /files?bucket= - List with bucket filter")
         except Exception as e:
             self.fail_test("GET /files?bucket=", str(e))
 
         # List files with tags filter
         try:
-            response = self.client.list(tags=["e2e", "test"])
+            self.client.list(tags=["e2e", "test"])
             self.pass_test("GET /files?tags= - List with tags filter")
         except Exception as e:
             self.fail_test("GET /files?tags=", str(e))
@@ -217,7 +244,7 @@ class E2ETest:
 
         # Get nested index
         try:
-            index = self.client.index(category="e2e-test")
+            self.client.index(category="e2e-test")
             self.pass_test("GET /files/index - Nested index")
         except Exception as e:
             self.fail_test("GET /files/index", str(e))
@@ -227,13 +254,14 @@ class E2ETest:
     def test_download_tracking(self) -> None:
         self.section("Download Tracking")
 
-        # Record downloads
+        # Record downloads using remote tuple
         try:
-            from elaunira.r2index import DownloadRecordRequest
-
             for i in range(4):
                 download_request = DownloadRecordRequest(
-                    file_id=f"e2e-test-file-{i}",  # This won't link to real file but tests the endpoint
+                    bucket="e2e-test-bucket",
+                    remote_path="/e2e-tests",
+                    remote_filename=f"test-file-{i}.txt",
+                    remote_version="v1",
                     ip_address=f"192.168.1.{100 + i}",
                     user_agent="E2E-Test-Agent/1.0",
                 )
@@ -251,21 +279,21 @@ class E2ETest:
 
         # Timeseries
         try:
-            response = self.client.get_timeseries(start=start, end=end, granularity="hour")
+            self.client.get_timeseries(start=start, end=end, scale="hour")
             self.pass_test("GET /analytics/timeseries - Time series data")
         except Exception as e:
             self.fail_test("GET /analytics/timeseries", str(e))
 
         # Summary
         try:
-            response = self.client.get_summary(start=start, end=end)
+            self.client.get_summary(start=start, end=end)
             self.pass_test("GET /analytics/summary - Summary stats")
         except Exception as e:
             self.fail_test("GET /analytics/summary", str(e))
 
         # By IP
         try:
-            response = self.client.get_downloads_by_ip(
+            self.client.get_downloads_by_ip(
                 ip_address="192.168.1.100",
                 start=start,
                 end=end,
@@ -276,7 +304,7 @@ class E2ETest:
 
         # User agents
         try:
-            response = self.client.get_user_agents(start=start, end=end)
+            self.client.get_user_agents(start=start, end=end)
             self.pass_test("GET /analytics/user-agents - User agent stats")
         except Exception as e:
             self.fail_test("GET /analytics/user-agents", str(e))
@@ -304,10 +332,10 @@ class E2ETest:
                 remote_filename="test-file-2.txt",
                 remote_version="v1",
                 size=512,
-                md5="d41d8cd98f00b204e9800998ecf8427e",
-                sha1="da39a3ee5e6b4b0d3255bfef95601890afd80709",
-                sha256="e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
-                sha512="cf83e1357eefb8bdf1542850d66d8007d620e4050b5715dc83f4a921d36ce9ce47d0d13c5d85f2b0ff8318d2877eec2f63b931bd47417a81a538327af927da3e",
+                checksum_md5="d41d8cd98f00b204e9800998ecf8427e",
+                checksum_sha1="da39a3ee5e6b4b0d3255bfef95601890afd80709",
+                checksum_sha256="e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+                checksum_sha512="cf83e1357eefb8bdf1542850d66d8007d620e4050b5715dc83f4a921d36ce9ce47d0d13c5d85f2b0ff8318d2877eec2f63b931bd47417a81a538327af927da3e",
             )
             self.client.create(create_request)
 
@@ -346,10 +374,10 @@ class E2ETest:
                 remote_filename="test.txt",
                 remote_version="v1",
                 size=100,
-                md5="d41d8cd98f00b204e9800998ecf8427e",
-                sha1="da39a3ee5e6b4b0d3255bfef95601890afd80709",
-                sha256="e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
-                sha512="cf83e1357eefb8bdf1542850d66d8007d620e4050b5715dc83f4a921d36ce9ce47d0d13c5d85f2b0ff8318d2877eec2f63b931bd47417a81a538327af927da3e",
+                checksum_md5="d41d8cd98f00b204e9800998ecf8427e",
+                checksum_sha1="da39a3ee5e6b4b0d3255bfef95601890afd80709",
+                checksum_sha256="e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+                checksum_sha512="cf83e1357eefb8bdf1542850d66d8007d620e4050b5715dc83f4a921d36ce9ce47d0d13c5d85f2b0ff8318d2877eec2f63b931bd47417a81a538327af927da3e",
             )
             self.client.create(invalid_request)
             self.fail_test("Should raise ValidationError")
@@ -367,17 +395,240 @@ class E2ETest:
         except Exception as e:
             self.fail_test("POST /maintenance/cleanup-downloads", str(e))
 
+    def test_upload_download(self) -> None:
+        self.section("R2 Upload/Download")
+
+        bucket = "r2index-e2e-tests"
+        version = datetime.now(timezone.utc).strftime("%Y%m%d-%H%M%S")
+        uploaded_record = None
+        r2_object_id = f"/e2e-tests/{version}/upload-test.txt"
+
+        # Create a temporary test file
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".txt", delete=False) as f:
+            f.write(f"E2E test file created at {datetime.now(timezone.utc).isoformat()}\n")
+            f.write("This file tests the upload and download functionality.\n")
+            test_file_path = Path(f.name)
+
+        try:
+            # Test upload
+            try:
+                uploaded_record = self.client.upload(
+                    bucket=bucket,
+                    local_path=test_file_path,
+                    category="e2e-test",
+                    entity="upload-test",
+                    extension="txt",
+                    media_type="text/plain",
+                    remote_path="/e2e-tests",
+                    remote_filename="upload-test.txt",
+                    remote_version=version,
+                    name="E2E Upload Test",
+                    tags=["e2e", "upload"],
+                )
+                if uploaded_record.checksum_md5 and uploaded_record.checksum_sha256:
+                    self.pass_test(f"Upload file to R2 (id: {uploaded_record.id})")
+                else:
+                    self.fail_test("Upload file to R2", "Missing checksums")
+            except Exception as e:
+                self.fail_test("Upload file to R2", str(e))
+                return
+
+            # Test download
+            with tempfile.TemporaryDirectory() as tmpdir:
+                try:
+                    download_path, download_record = self.client.download(
+                        bucket=bucket,
+                        object_id=r2_object_id,
+                        destination=Path(tmpdir) / "downloaded.txt",
+                    )
+                    if download_path.exists() and download_record.id == uploaded_record.id:
+                        self.pass_test("Download file from R2")
+                    else:
+                        self.fail_test("Download file from R2", "File not downloaded or ID mismatch")
+                except Exception as e:
+                    self.fail_test("Download file from R2", str(e))
+
+            # Test cleanup: delete from R2
+            try:
+                self.client.delete_from_r2(bucket, r2_object_id)
+                self.pass_test("Delete file from R2")
+            except Exception as e:
+                self.fail_test("Delete file from R2", str(e))
+
+            # Test cleanup: delete from index
+            try:
+                self.client.delete(uploaded_record.id)
+                self.pass_test("Delete file from index")
+                uploaded_record = None  # Mark as cleaned up
+            except Exception as e:
+                self.fail_test("Delete file from index", str(e))
+
+        finally:
+            # Cleanup local temp file
+            test_file_path.unlink(missing_ok=True)
+            # Fallback cleanup if tests failed
+            if uploaded_record:
+                try:
+                    self.client.delete_from_r2(bucket, r2_object_id)
+                except Exception:
+                    pass
+                try:
+                    self.client.delete(uploaded_record.id)
+                except Exception:
+                    pass
+
+    def test_large_file_upload(self) -> None:
+        self.section("Large File Upload (5GB)")
+
+        bucket = "r2index-e2e-tests"
+        version = datetime.now(timezone.utc).strftime("%Y%m%d-%H%M%S")
+        uploaded_record = None
+        r2_object_id = f"/e2e-tests/{version}/large-test-file.bin"
+        file_size = 5 * 1024 * 1024 * 1024  # 5GB
+        chunk_size = 64 * 1024 * 1024  # 64MB chunks for generation
+
+        # Create a temporary directory for the large file
+        with tempfile.TemporaryDirectory() as tmpdir:
+            test_file_path = Path(tmpdir) / "large-test-file.bin"
+            download_path = Path(tmpdir) / "downloaded-large-file.bin"
+
+            try:
+                # Generate large random file
+                print(f"  Generating {file_size / (1024**3):.1f}GB random file...")
+                bytes_written = 0
+                with open(test_file_path, "wb") as f:
+                    while bytes_written < file_size:
+                        chunk = os.urandom(min(chunk_size, file_size - bytes_written))
+                        f.write(chunk)
+                        bytes_written += len(chunk)
+                        progress_pct = (bytes_written / file_size) * 100
+                        print(f"\r  Generated: {bytes_written / (1024**3):.2f}GB ({progress_pct:.1f}%)", end="", flush=True)
+                print()  # newline after progress
+
+                actual_size = test_file_path.stat().st_size
+                if actual_size != file_size:
+                    self.fail_test("Generate large file", f"Expected {file_size} bytes, got {actual_size}")
+                    return
+
+                self.pass_test(f"Generate {file_size / (1024**3):.1f}GB random file")
+
+                # Upload with progress
+                def upload_progress(bytes_uploaded: int) -> None:
+                    pct = (bytes_uploaded / file_size) * 100
+                    print(f"\r  Uploading: {bytes_uploaded / (1024**3):.2f}GB ({pct:.1f}%)", end="", flush=True)
+
+                try:
+                    print("  Starting upload...")
+                    uploaded_record = self.client.upload(
+                        bucket=bucket,
+                        local_path=test_file_path,
+                        category="e2e-test",
+                        entity="large-file-test",
+                        extension="bin",
+                        media_type="application/octet-stream",
+                        remote_path="/e2e-tests",
+                        remote_filename="large-test-file.bin",
+                        remote_version=version,
+                        name="E2E Large File Test",
+                        tags=["e2e", "large-file"],
+                        progress_callback=upload_progress,
+                    )
+                    print()  # newline after progress
+                    if uploaded_record.size == file_size:
+                        self.pass_test(f"Upload {file_size / (1024**3):.1f}GB file to R2")
+                    else:
+                        self.fail_test("Upload large file", f"Size mismatch: expected {file_size}, got {uploaded_record.size}")
+                except Exception as e:
+                    print()  # newline after progress
+                    self.fail_test("Upload large file to R2", str(e))
+                    return
+
+                # Download with progress
+                def download_progress(bytes_downloaded: int) -> None:
+                    pct = (bytes_downloaded / file_size) * 100
+                    print(f"\r  Downloading: {bytes_downloaded / (1024**3):.2f}GB ({pct:.1f}%)", end="", flush=True)
+
+                try:
+                    print("  Starting download...")
+                    downloaded_file, _ = self.client.download(
+                        bucket=bucket,
+                        object_id=r2_object_id,
+                        destination=download_path,
+                        progress_callback=download_progress,
+                    )
+                    print()  # newline after progress
+
+                    downloaded_size = downloaded_file.stat().st_size
+                    if downloaded_size == file_size:
+                        self.pass_test(f"Download {file_size / (1024**3):.1f}GB file from R2")
+                    else:
+                        self.fail_test("Download large file", f"Size mismatch: expected {file_size}, got {downloaded_size}")
+                except Exception as e:
+                    print()  # newline after progress
+                    self.fail_test("Download large file from R2", str(e))
+
+                # Verify checksums match
+                try:
+                    original_checksum = uploaded_record.checksum_md5
+                    from elaunira.r2index.checksums import compute_checksums
+                    downloaded_checksums = compute_checksums(download_path)
+                    if downloaded_checksums.md5 == original_checksum:
+                        self.pass_test("Verify large file checksum")
+                    else:
+                        self.fail_test("Verify checksum", f"MD5 mismatch: {original_checksum} vs {downloaded_checksums.md5}")
+                except Exception as e:
+                    self.fail_test("Verify large file checksum", str(e))
+
+                # Cleanup R2
+                try:
+                    self.client.delete_from_r2(bucket, r2_object_id)
+                    self.pass_test("Delete large file from R2")
+                except Exception as e:
+                    self.fail_test("Delete large file from R2", str(e))
+
+                # Cleanup index
+                try:
+                    self.client.delete(uploaded_record.id)
+                    self.pass_test("Delete large file from index")
+                    uploaded_record = None
+                except Exception as e:
+                    self.fail_test("Delete large file from index", str(e))
+
+            finally:
+                # Fallback cleanup
+                if uploaded_record:
+                    try:
+                        self.client.delete_from_r2(bucket, r2_object_id)
+                    except Exception:
+                        pass
+                    try:
+                        self.client.delete(uploaded_record.id)
+                    except Exception:
+                        pass
+
 
 def main() -> None:
     if len(sys.argv) < 3:
-        print("Usage: python e2e_test.py <api_url> <api_token>")
+        print("Usage: python e2e_test.py <api_url> <api_token> [<r2_access_key_id> <r2_secret_access_key> <r2_account_id>]")
         print("Example: python e2e_test.py https://r2index.example.com my-secret-token")
+        print("         python e2e_test.py https://r2index.example.com my-secret-token access-key secret-key account-id")
         sys.exit(1)
 
     api_url = sys.argv[1]
     api_token = sys.argv[2]
 
-    test = E2ETest(api_url, api_token)
+    # Optional R2 credentials
+    r2_access_key_id = sys.argv[3] if len(sys.argv) > 3 else None
+    r2_secret_access_key = sys.argv[4] if len(sys.argv) > 4 else None
+    r2_account_id = sys.argv[5] if len(sys.argv) > 5 else None
+
+    test = E2ETest(
+        api_url,
+        api_token,
+        r2_access_key_id=r2_access_key_id,
+        r2_secret_access_key=r2_secret_access_key,
+        r2_account_id=r2_account_id,
+    )
     success = test.run()
 
     sys.exit(0 if success else 1)
