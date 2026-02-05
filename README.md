@@ -25,7 +25,7 @@ The Worker handles metadata only. File content is uploaded/downloaded directly t
 <tr>
 <td align="center">Ipregistry</td>
 <td align="center">Noticeable</td>
-<td align="center">Open Planet Data</td>
+<td align="center">OpenPlanetData</td>
 </tr>
 </table>
 
