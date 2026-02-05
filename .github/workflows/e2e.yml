@@ -17,7 +17,7 @@ jobs:
   e2e:
     name: End-to-End Tests
     runs-on: ubuntu-latest
-    if: ${{ vars.R2INDEX_API_URL != '' }}
+    if: ${{ secrets.R2INDEX_API_URL != '' }}
 
     steps:
       - uses: actions/checkout@v6
@@ -33,7 +33,7 @@ jobs:
       - name: Run E2E tests
         env:
           R2INDEX_API_TOKEN: ${{ secrets.R2INDEX_API_TOKEN }}
-          R2INDEX_API_URL: ${{ vars.R2INDEX_API_URL }}
+          R2INDEX_API_URL: ${{ secrets.R2INDEX_API_URL }}
           R2_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
           R2_ACCOUNT_ID: ${{ secrets.R2_ACCOUNT_ID }}
           R2_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
