@@ -140,6 +140,8 @@ class R2Storage:
                 ExtraArgs=extra_args if extra_args else None,
                 Callback=callback,
             )
+            if callback:
+                callback.finish()
         except Exception as e:
             raise UploadError(f"Failed to upload file to R2: {e}") from e
 
@@ -291,6 +293,8 @@ class R2Storage:
                 Config=boto_transfer_config,
                 Callback=callback,
             )
+            if callback:
+                callback.finish()
         except Exception as e:
             raise DownloadError(f"Failed to download file from R2: {e}") from e
 
@@ -324,6 +328,10 @@ class _ProgressCallback:
             if now - self._last_log_time >= self._progress_interval:
                 self._log_progress(now)
                 self._last_log_time = now
+
+    def finish(self) -> None:
+        """Log final progress unconditionally."""
+        self._log_progress(time.monotonic())
 
     def _log_progress(self, now: float) -> None:
         elapsed = now - self._start_time
