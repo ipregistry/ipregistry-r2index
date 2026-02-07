@@ -1,6 +1,7 @@
 """Synchronous R2Index API client."""
 
 import contextlib
+import logging
 from collections.abc import Callable
 from datetime import datetime
 from pathlib import Path
@@ -38,6 +39,8 @@ from .storage import R2Config, R2Storage, R2TransferConfig
 
 CHECKIP_URL = "https://checkip.amazonaws.com"
 DEFAULT_USER_AGENT = f"elaunira-r2index/{_version}"
+
+logger = logging.getLogger(__name__)
 
 
 class R2IndexClient:
@@ -677,13 +680,13 @@ class R2IndexClient:
         progress_callback: Callable[[int], None] | None = None,
         transfer_config: R2TransferConfig | None = None,
         verify_checksum: bool = False,
-    ) -> tuple[Path, FileRecord]:
+    ) -> tuple[Path, FileRecord | None]:
         """
         Download a file from R2 and record the download in the index.
 
         This is a convenience method that performs:
-        1. Fetch file record from the API
-        2. Download the file from R2
+        1. Download the file from R2
+        2. Fetch file record from the index (non-fatal if not found)
         3. Optionally verify file integrity using checksums
         4. Record the download in the index for analytics
 
@@ -702,32 +705,16 @@ class R2IndexClient:
                 SHA-256 checksum from the file record.
 
         Returns:
-            A tuple of (downloaded file path, file record).
+            A tuple of (downloaded file path, file record or None if not indexed).
 
         Raises:
             R2IndexError: If R2 config is not provided.
-            NotFoundError: If the file is not found in the index.
             DownloadError: If download fails.
             ChecksumVerificationError: If checksum verification fails.
         """
         storage = self._get_storage()
 
-        # Resolve defaults
-        if ip_address is None:
-            ip_address = self._get_public_ip()
-        if user_agent is None:
-            user_agent = DEFAULT_USER_AGENT
-
-        # Step 1: Build remote tuple and get file record
-        remote_tuple = RemoteTuple(
-            bucket=bucket,
-            remote_path=source_path,
-            remote_filename=source_filename,
-            remote_version=source_version,
-        )
-        file_record = self.get_by_tuple(remote_tuple)
-
-        # Step 2: Build R2 object key and download
+        # Step 1: Build R2 object key and download
         object_key = f"{source_path.strip('/')}/{source_version}/{source_filename}"
         downloaded_path = storage.download_file(
             bucket,
@@ -736,6 +723,25 @@ class R2IndexClient:
             progress_callback=progress_callback,
             transfer_config=transfer_config,
         )
+
+        # Step 2: Fetch file record from the index (non-fatal if not found)
+        remote_tuple = RemoteTuple(
+            bucket=bucket,
+            remote_path=source_path,
+            remote_filename=source_filename,
+            remote_version=source_version,
+        )
+        try:
+            file_record = self.get_by_tuple(remote_tuple)
+        except NotFoundError:
+            logger.warning(
+                "File not found in index for %s/%s/%s — skipping checksum "
+                "verification and download recording",
+                source_path,
+                source_version,
+                source_filename,
+            )
+            return downloaded_path, None
 
         # Step 3: Verify checksum if requested
         if verify_checksum:
@@ -750,6 +756,11 @@ class R2IndexClient:
                     )
 
         # Step 4: Record the download
+        if ip_address is None:
+            ip_address = self._get_public_ip()
+        if user_agent is None:
+            user_agent = DEFAULT_USER_AGENT
+
         download_request = DownloadRecordRequest(
             bucket=bucket,
             remote_path=source_path,

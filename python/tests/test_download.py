@@ -216,6 +216,42 @@ class TestDownload:
             assert file_record.id == "file123"
 
 
+    def test_download_file_not_in_index(
+        self, client_with_r2: R2IndexClient, httpx_mock: HTTPXMock, tmp_path: Path
+    ):
+        """Test download succeeds even when file is not registered in the index."""
+        # Mock get_by_tuple returning 404
+        httpx_mock.add_response(
+            url="https://api.example.com/files/by-tuple?bucket=test-bucket&remote_path=%2Freleases%2Fmyapp&remote_filename=myapp.zip&remote_version=v1",
+            status_code=404,
+            json={
+                "code": "FILE_NOT_FOUND",
+                "message": "The requested file was not found.",
+                "resolution": "Verify the file ID or remote tuple exists.",
+            },
+        )
+
+        destination = tmp_path / "myapp.zip"
+
+        # Mock the R2 storage download
+        with patch.object(
+            client_with_r2._get_storage(),
+            "download_file",
+            return_value=destination,
+        ) as mock_download:
+            downloaded_path, file_record = client_with_r2.download(
+                bucket="test-bucket",
+                source_path="/releases/myapp",
+                source_filename="myapp.zip",
+                source_version="v1",
+                destination=str(destination),
+            )
+
+            mock_download.assert_called_once()
+            assert downloaded_path == destination
+            assert file_record is None
+
+
 class TestR2TransferConfig:
     """Tests for R2TransferConfig."""
 
