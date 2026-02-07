@@ -257,6 +257,7 @@ class AsyncR2Storage:
                         total_size=total_size,
                         progress_interval=progress_interval,
                         operation="Downloading",
+                        cumulative=True,
                     )
 
                 await client.download_file(
@@ -272,7 +273,12 @@ class AsyncR2Storage:
 
 
 class _AsyncProgressCallback:
-    """Wrapper to track cumulative progress for aioboto3 callback."""
+    """Wrapper to track cumulative progress for aioboto3 callback.
+
+    aioboto3 is inconsistent: download_fileobj wraps the callback and passes
+    cumulative bytes, while upload_fileobj passes incremental chunk sizes.
+    The ``cumulative`` flag controls which mode to use.
+    """
 
     def __init__(
         self,
@@ -280,17 +286,22 @@ class _AsyncProgressCallback:
         total_size: int | None = None,
         progress_interval: float | None = None,
         operation: str = "Transferring",
+        cumulative: bool = False,
     ) -> None:
         self._callback = callback
         self._bytes_transferred = 0
         self._total_size = total_size
         self._progress_interval = progress_interval
         self._operation = operation
+        self._cumulative = cumulative
         self._last_log_time = time.monotonic()
         self._start_time = time.monotonic()
 
     def __call__(self, bytes_amount: int) -> None:
-        self._bytes_transferred += bytes_amount
+        if self._cumulative:
+            self._bytes_transferred = bytes_amount
+        else:
+            self._bytes_transferred += bytes_amount
         if self._callback:
             self._callback(self._bytes_transferred)
         if self._progress_interval is not None:
