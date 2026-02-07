@@ -307,12 +307,6 @@ class _AsyncProgressCallback:
         if self._total_size is not None and self._total_size > 0:
             total = _format_bytes(self._total_size)
             pct = self._bytes_transferred / self._total_size * 100
-            logger.info(
-                "%s: %s / %s (%.1f%%) — %s/s",
-                self._operation, transferred, total, pct, speed_str,
-            )
+            print(f"{self._operation}: {transferred} / {total} ({pct:.1f}%) — {speed_str}/s")
         else:
-            logger.info(
-                "%s: %s — %s/s",
-                self._operation, transferred, speed_str,
-            )
+            print(f"{self._operation}: {transferred} — {speed_str}/s")
