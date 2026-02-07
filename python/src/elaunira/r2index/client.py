@@ -755,6 +755,7 @@ class R2IndexClient:
         if verify_checksum:
             expected_checksum = file_record.checksum_sha256
             if expected_checksum:
+                logger.info("Verifying SHA-256 checksum for %s", source_filename)
                 actual_checksums = compute_checksums(downloaded_path)
                 if actual_checksums.sha256 != expected_checksum:
                     raise ChecksumVerificationError(
@@ -762,6 +763,7 @@ class R2IndexClient:
                         expected=expected_checksum,
                         actual=actual_checksums.sha256,
                     )
+                logger.info("Checksum verified for %s", source_filename)
 
         # Step 4: Record the download
         if ip_address is None:
