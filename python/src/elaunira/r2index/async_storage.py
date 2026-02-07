@@ -7,6 +7,7 @@ from pathlib import Path
 
 import aioboto3
 from aiobotocore.config import AioConfig
+from boto3.s3.transfer import TransferConfig
 
 from .exceptions import DownloadError, UploadError
 from .storage import R2Config, R2TransferConfig, _format_bytes
@@ -66,6 +67,11 @@ class AsyncR2Storage:
             "Upload transfer config: threshold=%d, chunksize=%d, concurrency=%d",
             tc.multipart_threshold, tc.multipart_chunksize, tc.max_concurrency,
         )
+        s3_transfer_config = TransferConfig(
+            multipart_threshold=tc.multipart_threshold,
+            multipart_chunksize=tc.multipart_chunksize,
+            max_concurrency=tc.max_concurrency,
+        )
         aio_config = AioConfig(
             max_pool_connections=tc.max_concurrency,
         )
@@ -99,6 +105,7 @@ class AsyncR2Storage:
                     object_key,
                     ExtraArgs=extra_args if extra_args else None,
                     Callback=callback,
+                    Config=s3_transfer_config,
                 )
         except Exception as e:
             raise UploadError(f"Failed to upload file to R2: {e}") from e
@@ -239,6 +246,11 @@ class AsyncR2Storage:
             "Download transfer config: threshold=%d, chunksize=%d, concurrency=%d",
             tc.multipart_threshold, tc.multipart_chunksize, tc.max_concurrency,
         )
+        s3_transfer_config = TransferConfig(
+            multipart_threshold=tc.multipart_threshold,
+            multipart_chunksize=tc.multipart_chunksize,
+            max_concurrency=tc.max_concurrency,
+        )
         aio_config = AioConfig(
             max_pool_connections=tc.max_concurrency,
         )
@@ -273,6 +285,7 @@ class AsyncR2Storage:
                     object_key,
                     str(file_path),
                     Callback=callback,
+                    Config=s3_transfer_config,
                 )
         except Exception as e:
             raise DownloadError(f"Failed to download file from R2: {e}") from e
