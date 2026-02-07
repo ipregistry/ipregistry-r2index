@@ -1,6 +1,8 @@
 """Synchronous R2 storage operations using boto3."""
 
+import logging
 import os
+import time
 from collections.abc import Callable
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -9,6 +11,8 @@ import boto3
 from boto3.s3.transfer import TransferConfig
 
 from .exceptions import DownloadError, UploadError
+
+logger = logging.getLogger(__name__)
 
 # Default thresholds and part sizes for multipart transfers
 DEFAULT_MULTIPART_CHUNKSIZE = 100 * 1024 * 1024  # 100MB
@@ -74,6 +78,7 @@ class R2Storage:
         object_key: str,
         content_type: str | None = None,
         progress_callback: Callable[[int], None] | None = None,
+        progress_interval: float | None = 10.0,
         transfer_config: R2TransferConfig | None = None,
     ) -> str:
         """
@@ -113,8 +118,14 @@ class R2Storage:
             extra_args["ContentType"] = content_type
 
         callback = None
-        if progress_callback:
-            callback = _ProgressCallback(progress_callback)
+        if progress_callback or progress_interval is not None:
+            total_size = file_path.stat().st_size
+            callback = _ProgressCallback(
+                progress_callback,
+                total_size=total_size,
+                progress_interval=progress_interval,
+                operation="Uploading",
+            )
 
         try:
             self._client.upload_file(
@@ -211,7 +222,9 @@ class R2Storage:
         bucket: str,
         object_key: str,
         file_path: str | Path,
+        overwrite: bool = True,
         progress_callback: Callable[[int], None] | None = None,
+        progress_interval: float | None = 10.0,
         transfer_config: R2TransferConfig | None = None,
     ) -> Path:
         """
@@ -232,6 +245,10 @@ class R2Storage:
         """
         file_path = Path(file_path)
 
+        if not overwrite and file_path.exists():
+            logger.info("Skipping download, file already exists: %s", file_path)
+            return file_path
+
         # Ensure parent directory exists
         file_path.parent.mkdir(parents=True, exist_ok=True)
 
@@ -244,8 +261,19 @@ class R2Storage:
         )
 
         callback = None
-        if progress_callback:
-            callback = _ProgressCallback(progress_callback)
+        if progress_callback or progress_interval is not None:
+            total_size = None
+            try:
+                head = self._client.head_object(Bucket=bucket, Key=object_key)
+                total_size = head.get("ContentLength")
+            except Exception:
+                pass
+            callback = _ProgressCallback(
+                progress_callback,
+                total_size=total_size,
+                progress_interval=progress_interval,
+                operation="Downloading",
+            )
 
         try:
             self._client.download_file(
@@ -264,10 +292,54 @@ class R2Storage:
 class _ProgressCallback:
     """Wrapper to track cumulative progress for boto3 callback."""
 
-    def __init__(self, callback: Callable[[int], None]) -> None:
+    def __init__(
+        self,
+        callback: Callable[[int], None] | None,
+        total_size: int | None = None,
+        progress_interval: float | None = None,
+        operation: str = "Transferring",
+    ) -> None:
         self._callback = callback
         self._bytes_transferred = 0
+        self._total_size = total_size
+        self._progress_interval = progress_interval
+        self._operation = operation
+        self._last_log_time = time.monotonic()
+        self._start_time = time.monotonic()
 
     def __call__(self, bytes_amount: int) -> None:
         self._bytes_transferred += bytes_amount
-        self._callback(self._bytes_transferred)
+        if self._callback:
+            self._callback(self._bytes_transferred)
+        if self._progress_interval is not None:
+            now = time.monotonic()
+            if now - self._last_log_time >= self._progress_interval:
+                self._log_progress(now)
+                self._last_log_time = now
+
+    def _log_progress(self, now: float) -> None:
+        elapsed = now - self._start_time
+        speed = self._bytes_transferred / elapsed if elapsed > 0 else 0
+        transferred = _format_bytes(self._bytes_transferred)
+        speed_str = _format_bytes(speed)
+        if self._total_size is not None and self._total_size > 0:
+            total = _format_bytes(self._total_size)
+            pct = self._bytes_transferred / self._total_size * 100
+            logger.info(
+                "%s: %s / %s (%.1f%%) — %s/s",
+                self._operation, transferred, total, pct, speed_str,
+            )
+        else:
+            logger.info(
+                "%s: %s — %s/s",
+                self._operation, transferred, speed_str,
+            )
+
+
+def _format_bytes(size: float) -> str:
+    """Format a byte count as a human-readable string."""
+    for unit in ("B", "KB", "MB", "GB", "TB"):
+        if abs(size) < 1024:
+            return f"{size:.2f} {unit}"
+        size /= 1024
+    return f"{size:.2f} PB"

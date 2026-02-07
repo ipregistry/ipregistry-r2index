@@ -134,6 +134,31 @@ Default `max_concurrency` is 2x the number of CPU cores (minimum 4).
 
 ### Progress Tracking
 
+Uploads and downloads log progress to the `elaunira.r2index.storage` (or `elaunira.r2index.async_storage`) logger every 10 seconds by default, showing bytes transferred, percentage, and speed:
+
+```
+Uploading: 150.00 MB / 500.00 MB (30.0%) — 25.00 MB/s
+Downloading: 1.20 GB / 3.50 GB (34.3%) — 45.00 MB/s
+```
+
+Control the interval or disable it:
+
+```python
+# Log every 30 seconds
+path, record = client.download(
+    ...,
+    progress_interval=30.0,
+)
+
+# Disable progress logging
+path, record = client.download(
+    ...,
+    progress_interval=None,
+)
+```
+
+You can also provide a custom callback for programmatic progress tracking:
+
 ```python
 def on_progress(bytes_transferred: int) -> None:
     print(f"Downloaded: {bytes_transferred / 1024 / 1024:.1f} MB")
@@ -145,6 +170,21 @@ path, record = client.download(
     source_version="v1",
     destination="./downloads/myfile.zip",
     progress_callback=on_progress,
+)
+```
+
+### Skip Existing Downloads
+
+Skip downloading if the destination file already exists:
+
+```python
+path, record = client.download(
+    bucket="my-bucket",
+    source_path="/releases/myapp",
+    source_filename="myapp.zip",
+    source_version="v1",
+    destination="./downloads/myfile.zip",
+    overwrite=False,
 )
 ```
 

@@ -543,15 +543,16 @@ class R2IndexClient:
         destination_path: str,
         destination_filename: str,
         destination_version: str,
+        content_type: str | None = None,
+        create_checksum_files: bool = False,
         extension: str | None = None,
+        extra: dict[str, Any] | None = None,
         media_type: str | None = None,
         name: str | None = None,
-        tags: list[str] | None = None,
-        extra: dict[str, Any] | None = None,
-        content_type: str | None = None,
         progress_callback: Callable[[int], None] | None = None,
+        progress_interval: float | None = 10.0,
+        tags: list[str] | None = None,
         transfer_config: R2TransferConfig | None = None,
-        create_checksum_files: bool = False,
     ) -> FileRecord:
         """
         Upload a file to R2 and register it with the r2index API.
@@ -622,6 +623,7 @@ class R2IndexClient:
             content_type=content_type,
             progress_callback=progress_callback,
             transfer_config=transfer_config,
+            progress_interval=progress_interval,
         )
 
         # Step 4: Upload checksum files if requested
@@ -676,9 +678,11 @@ class R2IndexClient:
         source_version: str,
         destination: str | Path,
         ip_address: str | None = None,
-        user_agent: str | None = None,
+        overwrite: bool = True,
         progress_callback: Callable[[int], None] | None = None,
+        progress_interval: float | None = 10.0,
         transfer_config: R2TransferConfig | None = None,
+        user_agent: str | None = None,
         verify_checksum: bool = False,
     ) -> tuple[Path, FileRecord | None]:
         """
@@ -703,6 +707,8 @@ class R2IndexClient:
             transfer_config: Optional transfer configuration for multipart/threading.
             verify_checksum: If True, verify file integrity after download using
                 SHA-256 checksum from the file record.
+            overwrite: If False, skip download when destination file already
+                exists. Defaults to True.
 
         Returns:
             A tuple of (downloaded file path, file record or None if not indexed).
@@ -722,6 +728,8 @@ class R2IndexClient:
             destination,
             progress_callback=progress_callback,
             transfer_config=transfer_config,
+            progress_interval=progress_interval,
+            overwrite=overwrite,
         )
 
         # Step 2: Fetch file record from the index (non-fatal if not found)
