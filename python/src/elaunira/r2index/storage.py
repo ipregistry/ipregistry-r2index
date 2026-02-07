@@ -106,7 +106,7 @@ class R2Storage:
             raise UploadError(f"File not found: {file_path}")
 
         tc = transfer_config or R2TransferConfig()
-        logger.debug(
+        logger.info(
             "Upload transfer config: threshold=%d, chunksize=%d, concurrency=%d, threads=%s",
             tc.multipart_threshold, tc.multipart_chunksize, tc.max_concurrency, tc.use_threads,
         )
@@ -259,7 +259,7 @@ class R2Storage:
         file_path.parent.mkdir(parents=True, exist_ok=True)
 
         tc = transfer_config or R2TransferConfig()
-        logger.debug(
+        logger.info(
             "Download transfer config: threshold=%d, chunksize=%d, concurrency=%d, threads=%s",
             tc.multipart_threshold, tc.multipart_chunksize, tc.max_concurrency, tc.use_threads,
         )
