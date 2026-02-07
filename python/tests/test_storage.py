@@ -55,29 +55,29 @@ class TestProgressCallback:
             cb(1024)
         assert caplog.text == ""
 
-    def test_logs_when_interval_elapsed(self, capsys):
+    def test_logs_when_interval_elapsed(self, caplog):
         cb = _ProgressCallback(
             None,
             total_size=1024 * 1024,
             progress_interval=0.0,  # log on every call
             operation="Downloading",
         )
-        cb(512 * 1024)
-        captured = capsys.readouterr().out
-        assert "Downloading" in captured
-        assert "50.0%" in captured
+        with caplog.at_level(logging.INFO):
+            cb(512 * 1024)
+        assert "Downloading" in caplog.text
+        assert "50.0%" in caplog.text
 
-    def test_logs_without_total_size(self, capsys):
+    def test_logs_without_total_size(self, caplog):
         cb = _ProgressCallback(
             None,
             total_size=None,
             progress_interval=0.0,
             operation="Uploading",
         )
-        cb(1024)
-        captured = capsys.readouterr().out
-        assert "Uploading" in captured
-        assert "%" not in captured
+        with caplog.at_level(logging.INFO):
+            cb(1024)
+        assert "Uploading" in caplog.text
+        assert "%" not in caplog.text
 
 
 class TestDownloadOverwrite:
