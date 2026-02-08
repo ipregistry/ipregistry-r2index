@@ -663,7 +663,12 @@ class R2IndexClient:
             checksum_sha512=checksums.sha512,
         )
 
-        return self.create(create_request)
+        result = self.create(create_request)
+        logger.info(
+            "Upload successful: bucket=%s, path=%s, filename=%s, version=%s",
+            bucket, destination_path, destination_filename, destination_version,
+        )
+        return result
 
     def _get_public_ip(self) -> str:
         """Fetch public IP address from checkip.amazonaws.com."""
@@ -781,6 +786,10 @@ class R2IndexClient:
         )
         self.record_download(download_request)
 
+        logger.info(
+            "Download successful: bucket=%s, path=%s, filename=%s, version=%s",
+            bucket, source_path, source_filename, source_version,
+        )
         return downloaded_path, file_record
 
     def delete_from_r2(
