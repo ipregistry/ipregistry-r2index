@@ -4,7 +4,7 @@ export default defineWorkersConfig({
   test: {
     poolOptions: {
       workers: {
-        wrangler: { configPath: './wrangler.toml' },
+        wrangler: { configPath: './wrangler.jsonc' },
         miniflare: {
           bindings: {
             R2INDEX_API_TOKEN: 'test-token',
