@@ -252,6 +252,77 @@ class TestDownload:
             assert file_record is None
 
 
+    def test_download_without_version(
+        self, client_with_r2: R2IndexClient, httpx_mock: HTTPXMock, tmp_path: Path
+    ):
+        """Test download without source_version omits version from object key."""
+        # Mock get_by_tuple (without remote_version param)
+        httpx_mock.add_response(
+            url="https://api.example.com/files/by-tuple?bucket=test-bucket&remote_path=%2Freleases%2Fmyapp&remote_filename=myapp.zip",
+            status_code=404,
+            json={
+                "code": "FILE_NOT_FOUND",
+                "message": "The requested file was not found.",
+                "resolution": "Verify the file ID or remote tuple exists.",
+            },
+        )
+
+        destination = tmp_path / "myapp.zip"
+
+        with patch.object(
+            client_with_r2._get_storage(),
+            "download_file",
+            return_value=destination,
+        ) as mock_download:
+            downloaded_path, file_record = client_with_r2.download(
+                bucket="test-bucket",
+                source_path="/releases/myapp",
+                source_filename="myapp.zip",
+                destination=str(destination),
+            )
+
+            # Verify object key has no version segment
+            call_args = mock_download.call_args
+            object_key = call_args[0][1]
+            assert object_key == "releases/myapp/myapp.zip"
+
+            assert downloaded_path == destination
+            assert file_record is None
+
+    def test_download_with_version_includes_version_in_key(
+        self, client_with_r2: R2IndexClient, httpx_mock: HTTPXMock, tmp_path: Path
+    ):
+        """Test download with source_version includes version in object key."""
+        httpx_mock.add_response(
+            url="https://api.example.com/files/by-tuple?bucket=test-bucket&remote_path=%2Freleases%2Fmyapp&remote_filename=myapp.zip&remote_version=v1",
+            status_code=404,
+            json={
+                "code": "FILE_NOT_FOUND",
+                "message": "The requested file was not found.",
+                "resolution": "Verify the file ID or remote tuple exists.",
+            },
+        )
+
+        destination = tmp_path / "myapp.zip"
+
+        with patch.object(
+            client_with_r2._get_storage(),
+            "download_file",
+            return_value=destination,
+        ) as mock_download:
+            client_with_r2.download(
+                bucket="test-bucket",
+                source_path="/releases/myapp",
+                source_filename="myapp.zip",
+                destination=str(destination),
+                source_version="v1",
+            )
+
+            call_args = mock_download.call_args
+            object_key = call_args[0][1]
+            assert object_key == "releases/myapp/v1/myapp.zip"
+
+
 class TestR2TransferConfig:
     """Tests for R2TransferConfig."""
 

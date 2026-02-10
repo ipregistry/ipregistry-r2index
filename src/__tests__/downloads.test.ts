@@ -62,6 +62,19 @@ describe('POST /downloads - Record download', () => {
     expect(response.status).toBe(201);
   });
 
+  it('records a download without remote_version', async () => {
+    const { remote_version, ...input } = validDownloadInput;
+    const response = await SELF.fetch('http://localhost/downloads', {
+      method: 'POST',
+      headers: createAuthHeaders(),
+      body: JSON.stringify(input),
+    });
+    expect(response.status).toBe(201);
+    const data = await response.json() as { id: string; remote_version: string | null };
+    expect(data.id).toBeTruthy();
+    expect(data.remote_version).toBeNull();
+  });
+
   it('rejects missing required fields', async () => {
     const response = await SELF.fetch('http://localhost/downloads', {
       method: 'POST',

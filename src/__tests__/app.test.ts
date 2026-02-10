@@ -185,6 +185,65 @@ describe('POST /files - Create file', () => {
   });
 });
 
+describe('POST /files - Create file without version', () => {
+  beforeEach(async () => {
+    await env.D1.prepare('DELETE FROM file_tags').run();
+    await env.D1.prepare('DELETE FROM files').run();
+  });
+
+  it('creates a file without remote_version', async () => {
+    const { remote_version, ...inputWithoutVersion } = validFileInput;
+    const response = await SELF.fetch('http://localhost/files', {
+      method: 'POST',
+      headers: createAuthHeaders(),
+      body: JSON.stringify(inputWithoutVersion),
+    });
+    expect(response.status).toBe(201);
+    const data = await response.json() as { id: string; remote_version: string | null };
+    expect(data.id).toBeTruthy();
+    expect(data.remote_version).toBeNull();
+  });
+
+  it('retrieves file without version via by-tuple', async () => {
+    const { remote_version, ...inputWithoutVersion } = validFileInput;
+    await SELF.fetch('http://localhost/files', {
+      method: 'POST',
+      headers: createAuthHeaders(),
+      body: JSON.stringify(inputWithoutVersion),
+    });
+
+    const response = await SELF.fetch(
+      `http://localhost/files/by-tuple?bucket=${validFileInput.bucket}&remote_path=${encodeURIComponent(validFileInput.remote_path)}&remote_filename=${validFileInput.remote_filename}`,
+      { headers: createAuthHeaders() }
+    );
+    expect(response.status).toBe(200);
+    const data = await response.json() as { remote_version: string | null };
+    expect(data.remote_version).toBeNull();
+  });
+
+  it('deletes file without version via remote tuple', async () => {
+    const { remote_version, ...inputWithoutVersion } = validFileInput;
+    await SELF.fetch('http://localhost/files', {
+      method: 'POST',
+      headers: createAuthHeaders(),
+      body: JSON.stringify(inputWithoutVersion),
+    });
+
+    const response = await SELF.fetch('http://localhost/files', {
+      method: 'DELETE',
+      headers: createAuthHeaders(),
+      body: JSON.stringify({
+        bucket: validFileInput.bucket,
+        remote_path: validFileInput.remote_path,
+        remote_filename: validFileInput.remote_filename,
+      }),
+    });
+    expect(response.status).toBe(200);
+    const data = await response.json() as { success: boolean };
+    expect(data.success).toBe(true);
+  });
+});
+
 describe('GET /files - Search files', () => {
   beforeEach(async () => {
     await env.D1.prepare('DELETE FROM file_tags').run();

@@ -102,6 +102,12 @@ describe('createFileSchema', () => {
     expect(result.success).toBe(false);
   });
 
+  it('accepts input without remote_version', () => {
+    const { remote_version, ...inputWithoutVersion } = validInput;
+    const result = createFileSchema.safeParse(inputWithoutVersion);
+    expect(result.success).toBe(true);
+  });
+
   it('accepts uppercase hex in checksums', () => {
     const result = createFileSchema.safeParse({
       ...validInput,
@@ -192,12 +198,13 @@ describe('deleteByRemoteSchema', () => {
     expect(result.success).toBe(false);
   });
 
-  it('rejects missing remote_version', () => {
+  it('accepts missing remote_version', () => {
     const result = deleteByRemoteSchema.safeParse({
+      bucket: 'my-bucket',
       remote_path: '/uploads',
       remote_filename: 'file.txt',
     });
-    expect(result.success).toBe(false);
+    expect(result.success).toBe(true);
   });
 
   it('rejects empty remote_path', () => {
@@ -308,6 +315,12 @@ describe('createDownloadSchema', () => {
       ...validInput,
       user_agent: 'Mozilla/5.0 Chrome/120',
     });
+    expect(result.success).toBe(true);
+  });
+
+  it('accepts input without remote_version', () => {
+    const { remote_version, ...input } = validInput;
+    const result = createDownloadSchema.safeParse(input);
     expect(result.success).toBe(true);
   });
 

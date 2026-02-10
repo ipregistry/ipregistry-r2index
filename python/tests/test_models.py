@@ -103,6 +103,21 @@ def test_remote_tuple():
     assert remote.remote_path == "/data"
 
 
+def test_remote_tuple_without_version():
+    """Test RemoteTuple model without remote_version."""
+    remote = RemoteTuple(
+        bucket="my-bucket",
+        remote_path="/data",
+        remote_filename="file.txt",
+    )
+
+    assert remote.bucket == "my-bucket"
+    assert remote.remote_version is None
+
+    data = remote.model_dump(exclude_none=True)
+    assert "remote_version" not in data
+
+
 def test_download_record_request():
     """Test DownloadRecordRequest with remote tuple fields."""
     request = DownloadRecordRequest(
@@ -117,3 +132,18 @@ def test_download_record_request():
     data = request.model_dump()
     assert data["bucket"] == "my-bucket"
     assert data["ip_address"] == "192.168.1.1"
+
+
+def test_download_record_request_without_version():
+    """Test DownloadRecordRequest without remote_version."""
+    request = DownloadRecordRequest(
+        bucket="my-bucket",
+        remote_path="/data",
+        remote_filename="file.txt",
+        ip_address="192.168.1.1",
+    )
+
+    assert request.remote_version is None
+
+    data = request.model_dump(exclude_none=True)
+    assert "remote_version" not in data
