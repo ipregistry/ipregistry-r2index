@@ -12,6 +12,17 @@
       "database_id": "de77f23f-0f85-403f-b483-2b3db3059b87"
     }
   ],
+  "observability": {
+    "enabled": false,
+    "head_sampling_rate": 1,
+    "logs": {
+      "invocation_logs": true
+    },
+    "traces": {
+      "enabled": false,
+      "head_sampling_rate": 1
+    }
+  },
   // R2INDEX_API_TOKEN should be set via: wrangler secret put R2INDEX_API_TOKEN
   "vars": {
     "CACHE_MAX_AGE": "60",
