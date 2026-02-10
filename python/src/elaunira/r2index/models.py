@@ -11,7 +11,7 @@ class RemoteTuple(BaseModel):
     bucket: str
     remote_path: str
     remote_filename: str
-    remote_version: str
+    remote_version: str | None = None
 
 
 class FileCreateRequest(BaseModel):
@@ -109,7 +109,7 @@ class DownloadRecordRequest(BaseModel):
     bucket: str
     remote_path: str
     remote_filename: str
-    remote_version: str
+    remote_version: str | None = None
     ip_address: str
     user_agent: str | None = None
 

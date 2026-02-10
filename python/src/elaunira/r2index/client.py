@@ -613,7 +613,11 @@ class R2IndexClient:
         checksums = compute_checksums(source_path)
 
         # Step 2: Build R2 object key
-        object_key = f"{destination_path.strip('/')}/{destination_version}/{destination_filename}"
+        parts = [destination_path.strip('/')]
+        if destination_version:
+            parts.append(destination_version)
+        parts.append(destination_filename)
+        object_key = "/".join(parts)
 
         # Step 3: Upload to R2
         storage.upload_file(
@@ -680,8 +684,8 @@ class R2IndexClient:
         bucket: str,
         source_path: str,
         source_filename: str,
-        source_version: str,
         destination: str | Path,
+        source_version: str | None = None,
         ip_address: str | None = None,
         overwrite: bool = True,
         progress_callback: Callable[[int], None] | None = None,
@@ -726,7 +730,11 @@ class R2IndexClient:
         storage = self._get_storage()
 
         # Step 1: Build R2 object key and download
-        object_key = f"{source_path.strip('/')}/{source_version}/{source_filename}"
+        parts = [source_path.strip('/')]
+        if source_version:
+            parts.append(source_version)
+        parts.append(source_filename)
+        object_key = "/".join(parts)
         downloaded_path = storage.download_file(
             bucket,
             object_key,
@@ -815,7 +823,11 @@ class R2IndexClient:
             R2IndexError: If R2 config is not provided or deletion fails.
         """
         storage = self._get_storage()
-        object_key = f"{path.strip('/')}/{version}/{filename}"
+        parts = [path.strip('/')]
+        if version:
+            parts.append(version)
+        parts.append(filename)
+        object_key = "/".join(parts)
         storage.delete_object(bucket, object_key)
 
         if delete_checksum_files:
