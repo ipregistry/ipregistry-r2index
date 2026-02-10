@@ -674,3 +674,51 @@ describe('Tag filtering', () => {
     expect(data.total).toBe(0);
   });
 });
+
+describe('D1 session middleware', () => {
+  beforeEach(async () => {
+    await env.D1.prepare('DELETE FROM file_tags').run();
+    await env.D1.prepare('DELETE FROM files').run();
+  });
+
+  it('returns X-D1-Bookmark header after a write', async () => {
+    const response = await SELF.fetch('http://localhost/files', {
+      method: 'POST',
+      headers: createAuthHeaders(),
+      body: JSON.stringify(validFileInput),
+    });
+    expect(response.status).toBe(201);
+    expect(response.headers.get('X-D1-Bookmark')).toBeTruthy();
+  });
+
+  it('returns X-D1-Bookmark header after a read', async () => {
+    const response = await SELF.fetch('http://localhost/files', {
+      headers: createAuthHeaders(),
+    });
+    expect(response.status).toBe(200);
+    expect(response.headers.get('X-D1-Bookmark')).toBeTruthy();
+  });
+
+  it('accepts X-D1-Bookmark header from a previous response', async () => {
+    // Create a file and capture the bookmark
+    const createResponse = await SELF.fetch('http://localhost/files', {
+      method: 'POST',
+      headers: createAuthHeaders(),
+      body: JSON.stringify(validFileInput),
+    });
+    const bookmark = createResponse.headers.get('X-D1-Bookmark');
+    expect(bookmark).toBeTruthy();
+
+    // Use the bookmark in a subsequent read
+    const readResponse = await SELF.fetch('http://localhost/files', {
+      headers: {
+        ...createAuthHeaders(),
+        'X-D1-Bookmark': bookmark!,
+      },
+    });
+    expect(readResponse.status).toBe(200);
+    const data = await readResponse.json() as { total: number };
+    expect(data.total).toBe(1);
+    expect(readResponse.headers.get('X-D1-Bookmark')).toBeTruthy();
+  });
+});

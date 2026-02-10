@@ -1,10 +1,10 @@
 import { Context, Hono } from 'hono';
-import type { Env, SearchParams } from '../types';
+import type { Env, SearchParams, Variables } from '../types';
 import { getFileById, getFileByRemote, updateFile, deleteFile, deleteFileByRemote, searchFiles, upsertFile, getNestedIndex } from '../db/queries';
 import { Errors, validationError } from '../errors';
 import { createFileSchema, updateFileSchema, deleteByRemoteSchema, searchParamsSchema } from '../validation';
 
-const app = new Hono<{ Bindings: Env }>();
+const app = new Hono<{ Bindings: Env; Variables: Variables }>();
 
 // ============================================================================
 // Helpers
@@ -37,7 +37,7 @@ function getFilterParams(c: Context): SearchParams {
   };
 }
 
-function getCacheMaxAge(c: Context<{ Bindings: Env }>): number {
+function getCacheMaxAge(c: Context<{ Bindings: Env; Variables: Variables }>): number {
   return parseInt(c.env.CACHE_MAX_AGE || '60', 10);
 }
 
@@ -55,7 +55,7 @@ app.get('/', async (c) => {
   }
 
   try {
-    const result = await searchFiles(c.env.D1, parsed.data);
+    const result = await searchFiles(c.get('db'), parsed.data);
     c.header('Cache-Control', `public, max-age=${getCacheMaxAge(c)}`);
     return c.json(result);
   } catch (e) {
@@ -75,7 +75,7 @@ app.post('/', async (c) => {
     return c.json(validationError(parsed.error.flatten().fieldErrors), 400);
   }
 
-  const { file, created } = await upsertFile(c.env.D1, parsed.data);
+  const { file, created } = await upsertFile(c.get('db'), parsed.data);
   return c.json(file, created ? 201 : 200);
 });
 
@@ -94,7 +94,7 @@ app.get('/by-tuple', async (c) => {
     }), 400);
   }
 
-  const file = await getFileByRemote(c.env.D1, bucket, remotePath, remoteFilename, remoteVersion);
+  const file = await getFileByRemote(c.get('db'), bucket, remotePath, remoteFilename, remoteVersion);
 
   if (!file) {
     return c.json(Errors.FILE_NOT_FOUND, 404);
@@ -106,7 +106,7 @@ app.get('/by-tuple', async (c) => {
 // Get nested index (grouped by entity then extension)
 app.get('/index', async (c) => {
   const params = getFilterParams(c);
-  const index = await getNestedIndex(c.env.D1, params);
+  const index = await getNestedIndex(c.get('db'), params);
 
   c.header('Cache-Control', `public, max-age=${getCacheMaxAge(c)}`);
   return c.json(index);
@@ -114,7 +114,7 @@ app.get('/index', async (c) => {
 
 // Get file by ID
 app.get('/:id', async (c) => {
-  const file = await getFileById(c.env.D1, c.req.param('id'));
+  const file = await getFileById(c.get('db'), c.req.param('id'));
 
   if (!file) {
     return c.json(Errors.FILE_NOT_FOUND, 404);
@@ -133,7 +133,7 @@ app.put('/:id', async (c) => {
   }
 
   try {
-    const file = await updateFile(c.env.D1, c.req.param('id'), parsed.data);
+    const file = await updateFile(c.get('db'), c.req.param('id'), parsed.data);
 
     if (!file) {
       return c.json(Errors.FILE_NOT_FOUND, 404);
@@ -150,7 +150,7 @@ app.put('/:id', async (c) => {
 
 // Delete file metadata by ID
 app.delete('/:id', async (c) => {
-  const deleted = await deleteFile(c.env.D1, c.req.param('id'));
+  const deleted = await deleteFile(c.get('db'), c.req.param('id'));
 
   if (!deleted) {
     return c.json(Errors.FILE_NOT_FOUND, 404);
@@ -169,7 +169,7 @@ app.delete('/', async (c) => {
   }
 
   const deleted = await deleteFileByRemote(
-    c.env.D1,
+    c.get('db'),
     parsed.data.bucket,
     parsed.data.remote_path,
     parsed.data.remote_filename,

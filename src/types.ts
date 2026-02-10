@@ -6,6 +6,7 @@ export interface Env {
 }
 
 export interface Variables {
+  db: D1Database;
   requestId: string;
 }
 

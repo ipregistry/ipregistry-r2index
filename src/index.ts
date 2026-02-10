@@ -2,6 +2,7 @@ import { Hono } from 'hono';
 import { cors } from 'hono/cors';
 import type { Env, Variables } from './types';
 import { authMiddleware } from './middleware/auth';
+import { d1SessionMiddleware } from './middleware/d1-session';
 import { requestIdMiddleware } from './middleware/request-id';
 import filesRoutes from './routes/files';
 import downloadsRoutes from './routes/downloads';
@@ -34,8 +35,8 @@ app.use('*', requestIdMiddleware);
 app.use('*', cors({
   origin: '*',
   allowMethods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-  allowHeaders: ['Content-Type', 'Authorization', 'X-Request-ID'],
-  exposeHeaders: ['X-Request-ID'],
+  allowHeaders: ['Content-Type', 'Authorization', 'X-Request-ID', 'X-D1-Bookmark'],
+  exposeHeaders: ['X-Request-ID', 'X-D1-Bookmark'],
   maxAge: 86400,
 }));
 
@@ -44,6 +45,9 @@ app.get('/health', (c) => c.json({ status: 'ok' }));
 
 // Apply auth middleware to all other routes
 app.use('/*', authMiddleware);
+
+// D1 session middleware (after auth, before routes)
+app.use('/*', d1SessionMiddleware);
 
 // Mount routes
 app.route('/files', filesRoutes);
@@ -58,7 +62,7 @@ app.post('/maintenance/cleanup-downloads', async (c) => {
     return c.json({ error: 'DOWNLOADS_RETENTION_DAYS must be positive' }, 400);
   }
 
-  const deleted = await cleanupOldDownloads(c.env.D1, retentionDays);
+  const deleted = await cleanupOldDownloads(c.get('db'), retentionDays);
   return c.json({ deleted_count: deleted, retention_days: retentionDays });
 });
 

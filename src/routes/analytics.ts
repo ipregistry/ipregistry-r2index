@@ -1,10 +1,10 @@
 import { Context, Hono } from 'hono';
-import type { AnalyticsScale, Env } from '../types';
+import type { AnalyticsScale, Env, Variables } from '../types';
 import { getTimeSeries, getSummary, getDownloadsByIp, getUserAgentStats } from '../db/downloads';
 import { validationError } from '../errors';
 import { analyticsParamsSchema } from '../validation';
 
-const app = new Hono<{ Bindings: Env }>();
+const app = new Hono<{ Bindings: Env; Variables: Variables }>();
 
 function getAnalyticsParams(c: Context) {
   return {
@@ -21,7 +21,7 @@ function getAnalyticsParams(c: Context) {
   };
 }
 
-function getCacheMaxAge(c: Context<{ Bindings: Env }>): number {
+function getCacheMaxAge(c: Context<{ Bindings: Env; Variables: Variables }>): number {
   return parseInt(c.env.CACHE_MAX_AGE || '60', 10);
 }
 
@@ -37,7 +37,7 @@ app.get('/timeseries', async (c) => {
   const { start, end, scale, bucket, remote_path, remote_filename, remote_version, limit } = parsed.data;
   const filesLimit = Math.min(parseInt(limit || '100', 10), 1000);
   const data = await getTimeSeries(
-    c.env.D1,
+    c.get('db'),
     parseInt(start, 10),
     parseInt(end, 10),
     (scale || 'day') as AnalyticsScale,
@@ -64,7 +64,7 @@ app.get('/summary', async (c) => {
 
   const { start, end, bucket, remote_path, remote_filename, remote_version } = parsed.data;
   const summary = await getSummary(
-    c.env.D1,
+    c.get('db'),
     parseInt(start, 10),
     parseInt(end, 10),
     { bucket, remote_path, remote_filename, remote_version }
@@ -90,7 +90,7 @@ app.get('/by-ip', async (c) => {
   }
 
   const result = await getDownloadsByIp(
-    c.env.D1,
+    c.get('db'),
     ip,
     parseInt(start, 10),
     parseInt(end, 10),
@@ -113,7 +113,7 @@ app.get('/user-agents', async (c) => {
 
   const { start, end, bucket, remote_path, remote_filename, remote_version, limit } = parsed.data;
   const data = await getUserAgentStats(
-    c.env.D1,
+    c.get('db'),
     parseInt(start, 10),
     parseInt(end, 10),
     { bucket, remote_path, remote_filename, remote_version },
