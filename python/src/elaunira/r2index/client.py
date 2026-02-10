@@ -278,10 +278,14 @@ class R2IndexClient:
             NotFoundError: If the file is not found.
         """
         params = {
-            "bucket": remote_tuple.bucket,
-            "remote_path": remote_tuple.remote_path,
-            "remote_filename": remote_tuple.remote_filename,
-            "remote_version": remote_tuple.remote_version,
+            k: v
+            for k, v in {
+                "bucket": remote_tuple.bucket,
+                "remote_path": remote_tuple.remote_path,
+                "remote_filename": remote_tuple.remote_filename,
+                "remote_version": remote_tuple.remote_version,
+            }.items()
+            if v is not None
         }
         response = self._client.get("/files/by-tuple", params=params)
         data = self._handle_response(response)
