@@ -43,7 +43,7 @@ npm install
 wrangler d1 create r2index
 ```
 
-Update `wrangler.toml` with the returned `database_id`.
+Update `wrangler.jsonc` with the returned `database_id`.
 
 ### 3. Apply schema
 
@@ -65,26 +65,7 @@ npm run deploy
 
 ## Configuration
 
-### wrangler.toml
-
-```toml
-name = "r2index"
-main = "src/index.ts"
-compatibility_date = "2026-01-31"
-
-routes = [
-  { pattern = "r2index.acme.com/*", zone_name = "acme.com" }
-]
-
-[[d1_databases]]
-binding = "D1"
-database_name = "r2index"
-database_id = "<your-database-id>"
-
-[vars]
-CACHE_MAX_AGE = "60"
-# DOWNLOADS_RETENTION_DAYS = "365"
-```
+See [`wrangler.jsonc`](wrangler.jsonc) for the full configuration.
 
 ### Environment Variables
 
@@ -135,6 +116,15 @@ The tuple `(bucket, remote_path, remote_filename, remote_version)` uniquely iden
 ## API Reference
 
 All endpoints require authentication via `Authorization: Bearer <token>` header.
+
+### D1 Read Replication (Sessions API)
+
+All database interactions use the D1 Sessions API for sequential consistency. Clients can pass the `X-D1-Bookmark` response header from a previous request as a request header on subsequent calls to ensure read-after-write consistency across requests.
+
+| Header | Direction | Description |
+|--------|-----------|-------------|
+| `X-D1-Bookmark` | Request | Optional bookmark from a previous response |
+| `X-D1-Bookmark` | Response | Bookmark reflecting the latest database state |
 
 ### Health Check
 
@@ -686,11 +676,14 @@ curl -X POST "https://r2index.acme.com/maintenance/cleanup-downloads" \
 
 **Cloudflare Cron Trigger Example:**
 
-Add to `wrangler.toml`:
+Add to `wrangler.jsonc`:
 
-```toml
-[triggers]
-crons = ["0 2 * * *"]  # Run daily at 2 AM UTC
+```jsonc
+{
+  "triggers": {
+    "crons": ["0 2 * * *"]  // Run daily at 2 AM UTC
+  }
+}
 ```
 
 Then handle the scheduled event in your worker:
