@@ -28,7 +28,7 @@ export interface FileRecord {
   name: string | null;
   remote_filename: string;
   remote_path: string;
-  remote_version: string;
+  remote_version: string | null;
   size: number | null;
   tags?: string[];
   updated: number;
@@ -49,7 +49,7 @@ export interface CreateFileInput {
   name?: string;
   remote_filename: string;
   remote_path: string;
-  remote_version: string;
+  remote_version?: string;
   size?: number;
   tags?: string[];
 }
@@ -125,7 +125,7 @@ export interface DownloadRecord {
   bucket: string;
   remote_path: string;
   remote_filename: string;
-  remote_version: string;
+  remote_version: string | null;
   ip_address: string;
   user_agent: string | null;
   downloaded_at: number;
@@ -138,7 +138,7 @@ export interface CreateDownloadInput {
   bucket: string;
   remote_path: string;
   remote_filename: string;
-  remote_version: string;
+  remote_version?: string;
   ip_address: string;
   user_agent?: string;
 }
@@ -163,7 +163,7 @@ export interface FileDownloadStats {
   bucket: string;
   remote_path: string;
   remote_filename: string;
-  remote_version: string;
+  remote_version: string | null;
   downloads: number;
   unique_downloads: number;
 }
@@ -187,7 +187,7 @@ export interface DownloadsByIpResult {
     bucket: string;
     remote_path: string;
     remote_filename: string;
-    remote_version: string;
+    remote_version: string | null;
     downloaded_at: number;
     user_agent: string | null;
   }[];

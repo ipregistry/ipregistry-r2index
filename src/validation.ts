@@ -19,7 +19,7 @@ export const createFileSchema = z.object({
   name: z.string().max(255).optional(),
   remote_filename: z.string().min(1).max(255),
   remote_path: z.string().min(1).max(500),
-  remote_version: z.string().min(1).max(100),
+  remote_version: z.string().min(1).max(100).optional(),
   size: z.number().int().nonnegative().optional(),
   tags: z.array(z.string().min(1).max(50)).max(20).optional(),
 });
@@ -62,7 +62,7 @@ export const deleteByRemoteSchema = z.object({
   bucket: z.string().min(1).max(100),
   remote_filename: z.string().min(1).max(255),
   remote_path: z.string().min(1).max(500),
-  remote_version: z.string().min(1).max(100),
+  remote_version: z.string().min(1).max(100).optional(),
 });
 
 export type DeleteByRemoteInput = z.infer<typeof deleteByRemoteSchema>;
@@ -94,7 +94,7 @@ export const createDownloadSchema = z.object({
   bucket: z.string().min(1).max(100),
   remote_path: z.string().min(1).max(500),
   remote_filename: z.string().min(1).max(255),
-  remote_version: z.string().min(1).max(100),
+  remote_version: z.string().min(1).max(100).optional(),
   ip_address: z.string().min(1).max(45), // IPv6 max length
   user_agent: z.string().max(500).optional(),
 });

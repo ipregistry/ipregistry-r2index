@@ -132,11 +132,19 @@ export async function getFileByRemote(
   bucket: string,
   remotePath: string,
   remoteFilename: string,
-  remoteVersion: string
+  remoteVersion?: string
 ): Promise<FileRecord | null> {
-  const raw = await db.prepare(
-    'SELECT * FROM files WHERE bucket = ? AND remote_path = ? AND remote_filename = ? AND remote_version = ?'
-  ).bind(bucket, remotePath, remoteFilename, remoteVersion).first<FileRecordRaw>();
+  let query = 'SELECT * FROM files WHERE bucket = ? AND remote_path = ? AND remote_filename = ?';
+  const bindings: string[] = [bucket, remotePath, remoteFilename];
+
+  if (remoteVersion) {
+    query += ' AND remote_version = ?';
+    bindings.push(remoteVersion);
+  } else {
+    query += ' AND remote_version IS NULL';
+  }
+
+  const raw = await db.prepare(query).bind(...bindings).first<FileRecordRaw>();
 
   if (!raw) return null;
 
@@ -164,7 +172,7 @@ export async function createFile(db: D1Database, input: CreateFileInput): Promis
     input.media_type,
     input.remote_path,
     input.remote_filename,
-    input.remote_version,
+    input.remote_version ?? null,
     input.metadata_path ?? null,
     input.size ?? null,
     input.checksum_md5 ?? null,
@@ -231,17 +239,33 @@ export async function deleteFile(db: D1Database, id: string): Promise<boolean> {
   return result.meta.changes > 0;
 }
 
-export async function deleteFileByRemote(db: D1Database, bucket: string, remotePath: string, remoteFilename: string, remoteVersion: string): Promise<boolean> {
-  const result = await db.prepare(
-    'DELETE FROM files WHERE bucket = ? AND remote_path = ? AND remote_filename = ? AND remote_version = ?'
-  ).bind(bucket, remotePath, remoteFilename, remoteVersion).run();
+export async function deleteFileByRemote(db: D1Database, bucket: string, remotePath: string, remoteFilename: string, remoteVersion?: string): Promise<boolean> {
+  let query = 'DELETE FROM files WHERE bucket = ? AND remote_path = ? AND remote_filename = ?';
+  const bindings: string[] = [bucket, remotePath, remoteFilename];
+
+  if (remoteVersion) {
+    query += ' AND remote_version = ?';
+    bindings.push(remoteVersion);
+  } else {
+    query += ' AND remote_version IS NULL';
+  }
+
+  const result = await db.prepare(query).bind(...bindings).run();
   return result.meta.changes > 0;
 }
 
 export async function upsertFile(db: D1Database, input: CreateFileInput): Promise<{ file: FileRecord; created: boolean }> {
-  const existing = await db.prepare(
-    'SELECT id FROM files WHERE bucket = ? AND remote_path = ? AND remote_filename = ? AND remote_version = ?'
-  ).bind(input.bucket, input.remote_path, input.remote_filename, input.remote_version).first<{ id: string }>();
+  let upsertQuery = 'SELECT id FROM files WHERE bucket = ? AND remote_path = ? AND remote_filename = ?';
+  const upsertBindings: (string | undefined)[] = [input.bucket, input.remote_path, input.remote_filename];
+
+  if (input.remote_version) {
+    upsertQuery += ' AND remote_version = ?';
+    upsertBindings.push(input.remote_version);
+  } else {
+    upsertQuery += ' AND remote_version IS NULL';
+  }
+
+  const existing = await db.prepare(upsertQuery).bind(...upsertBindings).first<{ id: string }>();
 
   if (existing) {
     const now = Date.now();

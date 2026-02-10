@@ -86,12 +86,11 @@ app.get('/by-tuple', async (c) => {
   const remoteFilename = c.req.query('remote_filename');
   const remoteVersion = c.req.query('remote_version');
 
-  if (!bucket || !remotePath || !remoteFilename || !remoteVersion) {
+  if (!bucket || !remotePath || !remoteFilename) {
     return c.json(validationError({
       bucket: !bucket ? ['bucket is required'] : [],
       remote_path: !remotePath ? ['remote_path is required'] : [],
       remote_filename: !remoteFilename ? ['remote_filename is required'] : [],
-      remote_version: !remoteVersion ? ['remote_version is required'] : [],
     }), 400);
   }
 
