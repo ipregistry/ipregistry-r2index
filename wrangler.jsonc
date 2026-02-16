@@ -1,15 +1,16 @@
 {
-  "name": "r2index",
+  "account_id": "ffba33b855ee4ded76deff01907fee6a",
+  "name": "ipregistry-r2index",
   "main": "src/index.ts",
   "compatibility_date": "2026-01-31",
   "routes": [
-    { "pattern": "r2index.example.com/*", "zone_name": "example.com" }
+    { "pattern": "r2index.ipregistry.co/*", "zone_name": "ipregistry.co" }
   ],
   "d1_databases": [
     {
       "binding": "D1",
-      "database_name": "r2index",
-      "database_id": "<YOUR_D1_DATABASE_ID>"
+      "database_name": "ipregistry-r2index",
+      "database_id": "0e37d5aa-f3d0-482b-93ff-7101c43d491d"
     }
   ],
   "observability": {

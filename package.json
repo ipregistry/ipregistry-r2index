@@ -5,7 +5,7 @@
   "scripts": {
     "dev": "wrangler dev",
     "deploy": "wrangler deploy",
-    "db:init": "wrangler d1 execute r2index --file=src/db/schema.sql --remote",
+    "db:init": "wrangler d1 execute ipregistry-r2index --file=src/db/schema.sql --remote",
     "test": "vitest run",
     "test:watch": "vitest"
   },
