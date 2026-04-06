@@ -10,7 +10,8 @@
     {
       "binding": "D1",
       "database_name": "ipregistry-r2index",
-      "database_id": "0e37d5aa-f3d0-482b-93ff-7101c43d491d"
+      "database_id": "0e37d5aa-f3d0-482b-93ff-7101c43d491d",
+      "migrations_dir": "node_modules/@elaunira/r2index/migrations"
     }
   ],
   "observability": {
