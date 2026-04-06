@@ -1,24 +1,24 @@
 {
-  "name": "r2index",
+  "name": "ipregistry-r2index",
   "version": "1.0.0",
-  "type": "module",
+  "description": "",
+  "main": "index.js",
   "scripts": {
-    "dev": "wrangler dev",
-    "deploy": "wrangler deploy",
-    "db:init": "wrangler d1 execute ipregistry-r2index --file=src/db/schema.sql --remote",
-    "test": "vitest run",
-    "test:watch": "vitest"
+    "deploy": "wrangler deploy"
   },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/ipregistry/ipregistry-r2index.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "bugs": {
+    "url": "https://github.com/ipregistry/ipregistry-r2index/issues"
+  },
+  "homepage": "https://github.com/ipregistry/ipregistry-r2index#readme",
   "dependencies": {
-    "hono": "^4.11.8",
-    "zod": "^4.3.6"
-  },
-  "devDependencies": {
-    "@cloudflare/vitest-pool-workers": "^0.12.10",
-    "@cloudflare/workers-types": "^4.20260206.0",
-    "miniflare": "^4.20260205.0",
-    "typescript": "^5.9.3",
-    "vitest": "^3.2.4",
-    "wrangler": "^4.63.0"
+    "@elaunira/r2index": "^2.0.0"
   }
 }
